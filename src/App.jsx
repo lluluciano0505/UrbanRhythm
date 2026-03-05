@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
+import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
 
 const LAYER_LABELS = ["Layer 1", "Layer 2", "Layer 3"];
 const LAYER_NAMES = ["Geo-Indexing", "Event Scraping", "Data Archive"];
 
-async function searchVenues(query) {
+async function searchVenues(query, placesService) {
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -56,8 +57,10 @@ CRITICAL: Return ONLY valid JSON array, no markdown, no explanation:
             v.id && v.type && v.name && v.address && v.lat && v.lng && v.rating && v.website && v.color
           ) : [];
           
-          console.log(`✓ Search "${query}": Found ${validVenues.length} venues`);
-          return validVenues;
+          if (validVenues.length > 0) {
+            console.log(`✓ Search "${query}": Found ${validVenues.length} venues`);
+            return validVenues;
+          }
         } catch (e) {
           console.error("Parse error:", e.message);
           console.error("Raw content:", content.slice(0, 300));
@@ -70,7 +73,45 @@ CRITICAL: Return ONLY valid JSON array, no markdown, no explanation:
     console.error("Search error:", error.message);
   }
 
-  return [];
+  if (!placesService || !query?.trim()) {
+    return [];
+  }
+
+  return new Promise((resolve) => {
+    const phillyCenter = new window.google.maps.LatLng(39.9526, -75.1652);
+    const request = {
+      query,
+      location: phillyCenter,
+      radius: 20000
+    };
+
+    placesService.textSearch(request, (results, status) => {
+      if (status !== window.google.maps.places.PlacesServiceStatus.OK || !results) {
+        console.warn("Places search failed:", status);
+        resolve([]);
+        return;
+      }
+
+      const mapped = results.map((place, index) => {
+        const types = place.types || [];
+        const isLibrary = types.includes("library") || query.toLowerCase().includes("library");
+        const type = isLibrary ? "library" : "museum";
+        return {
+          id: place.place_id || index + 1,
+          type,
+          name: place.name || "Unknown",
+          address: place.formatted_address || place.vicinity || "",
+          lat: place.geometry?.location?.lat?.() || 0,
+          lng: place.geometry?.location?.lng?.() || 0,
+          rating: place.rating || 4.3,
+          website: place.website || "",
+          color: type === "library" ? "#3B82F6" : "#F59E0B"
+        };
+      }).filter(v => v.lat && v.lng);
+
+      resolve(mapped);
+    });
+  });
 }
 
 async function scrapeVenueEvents(venue) {
@@ -159,11 +200,18 @@ export default function PhillyEventScraper() {
   const [hasSearched, setHasSearched] = useState(false);
   const [venues, setVenues] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [mapInstance, setMapInstance] = useState(null);
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey,
+    libraries: ["places"]
+  });
 
   const handleSearch = useCallback(async (query) => {
     setSearching(true);
     try {
-      const results = await searchVenues(query);
+      const placesService = mapInstance ? new window.google.maps.places.PlacesService(mapInstance) : null;
+      const results = await searchVenues(query, placesService);
       setVenues(results);
       setHasSearched(true);
     } catch (error) {
@@ -397,26 +445,51 @@ export default function PhillyEventScraper() {
                 </button>
               </div>
 
-              {/* Mini map visualization */}
+              {/* Google map visualization */}
               <div style={{ background: "#0F1117", border: "1px solid #1E2533", borderRadius: 4, padding: 20, marginBottom: 20, position: "relative", height: 200, overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 1px 1px, #1A1F2E 1px, transparent 0)", backgroundSize: "20px 20px", opacity: 0.5 }} />
-                <div style={{ position: "relative", fontSize: 10, color: "#4A5568", marginBottom: 8, letterSpacing: "0.1em" }}>GEO MAP · Philadelphia Bounding Box [39.867–40.138 N, -75.280–-74.956 W]</div>
-                <svg width="100%" height="160" style={{ position: "absolute", left: 0, top: 30 }}>
-                  {filteredVenues.map(v => {
-                    const x = ((v.lng - (-75.28)) / ((-74.956) - (-75.28))) * 100;
-                    const y = ((40.138 - v.lat) / (40.138 - 39.867)) * 100;
-                    return (
-                      <g key={v.id} onClick={() => { setSelectedVenue(v); }} style={{ cursor: "pointer" }}>
-                        <circle cx={`${x}%`} cy={`${y}%`} r={selectedVenue?.id === v.id ? 8 : 5}
-                          fill={v.color} opacity={selectedVenue?.id === v.id ? 1 : 0.7}
-                          style={{ transition: "all 0.2s" }} />
-                        {selectedVenue?.id === v.id && (
-                          <circle cx={`${x}%`} cy={`${y}%`} r={14} fill="none" stroke={v.color} strokeWidth={1} opacity={0.4} />
-                        )}
-                      </g>
-                    );
-                  })}
-                </svg>
+                <div style={{ position: "relative", fontSize: 10, color: "#4A5568", marginBottom: 8, letterSpacing: "0.1em" }}>GEO MAP · Google Maps</div>
+                {!googleMapsApiKey ? (
+                  <div style={{ fontSize: 12, color: "#A0AEC0", paddingTop: 20 }}>
+                    Missing Google Maps API key. Set VITE_GOOGLE_MAPS_API_KEY in a .env file and restart the dev server.
+                  </div>
+                ) : loadError ? (
+                  <div style={{ fontSize: 12, color: "#EF4444", paddingTop: 20 }}>
+                    Google Maps failed to load. Check API key restrictions and billing.
+                  </div>
+                ) : !isLoaded ? (
+                  <div style={{ fontSize: 12, color: "#A0AEC0", paddingTop: 20 }}>
+                    Loading map…
+                  </div>
+                ) : (
+                  <GoogleMap
+                    mapContainerStyle={{ width: "100%", height: "160px", borderRadius: 4 }}
+                    center={{ lat: 39.9526, lng: -75.1652 }}
+                    zoom={12}
+                    onLoad={(map) => setMapInstance(map)}
+                    onUnmount={() => setMapInstance(null)}
+                    options={{
+                      disableDefaultUI: true,
+                      zoomControl: true,
+                      streetViewControl: false,
+                      mapTypeControl: false,
+                      fullscreenControl: false
+                    }}
+                  >
+                    {filteredVenues.map(v => (
+                      <MarkerF
+                        key={v.id}
+                        position={{ lat: v.lat, lng: v.lng }}
+                        label={{
+                          text: v.type === "library" ? "L" : "M",
+                          color: "#0A0A0F",
+                          fontSize: "10px",
+                          fontWeight: "700"
+                        }}
+                        onClick={() => setSelectedVenue(v)}
+                      />
+                    ))}
+                  </GoogleMap>
+                )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
