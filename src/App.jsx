@@ -351,26 +351,41 @@ async function searchVenues(query, placesService, archive, onProgress) {
 // ═══════════════════════════════════════════════════════════════
 
 async function scrapeVenueEvents(venue) {
-  const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "";
+  // 调用后端爬虫 API
+  if (!venue.website) {
+    console.warn(`⚠️  ${venue.name} has no website URL - skipping`);
+    return [];
+  }
+
+  console.log(`🕷️  Scraping ${venue.name}: ${venue.website}`);
+
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("http://localhost:3333/api/scrape-venue", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openRouterApiKey}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-4-turbo", temperature: 0.7, max_tokens: 1200,
-        messages: [{ role: "user", content: `Generate 5-8 realistic upcoming events for this Philadelphia venue:
-Venue: ${venue.name} | Type: ${formatTypeLabel(venue.type)} | Website: ${venue.website}
-Dates in March-April 2026, varied times, categories, mix of free/paid.
-Return ONLY valid JSON array: [{"title":"...","date":"2026-03-15","time":"2:00 PM","category":"...","description":"20-50 words","free":true}]` }]
+        name: venue.name,
+        website: venue.website || "",
+        type: venue.type || ""
       })
     });
-    if (!response.ok) return [];
+
+    if (!response.ok) {
+      console.error(`❌ Backend error: ${response.status}`);
+      return [];
+    }
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return [];
-    const parsed = JSON.parse(content.replace(/```json|```/g, "").trim());
-    return (Array.isArray(parsed) ? parsed : []).filter(e => e.title && e.date && e.time && e.category && e.description && typeof e.free === "boolean");
-  } catch { return []; }
+    const events = (data.events || []).filter(e => e.title && e.date);
+    console.log(`✅ ${venue.name}: found ${events.length} events`);
+    
+    // 返回爬虫获取的事件，过滤掉空结果
+    return events;
+  } catch (err) {
+    console.error(`❌ Failed to scrape ${venue.name}:`, err.message);
+    console.error(`   Is backend running on http://localhost:3333?`);
+    // 如果后端不可用，返回空
+    return [];
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -513,6 +528,7 @@ export default function PhillyEventScraper() {
   const [modalMode, setModalMode] = useState(null);
   const [archiveFilter, setArchiveFilter] = useState("");
   const [archiveTagFilter, setArchiveTagFilter] = useState("all");
+  const [selectedArchiveVenue, setSelectedArchiveVenue] = useState(null);
 
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
   const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey, libraries: GOOGLE_MAPS_LIBRARIES });
@@ -1080,12 +1096,41 @@ export default function PhillyEventScraper() {
                       {v.website && <a href={v.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "#2563EB", textDecoration: "none" }}>site ↗</a>}
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
+                      <button className="icon-btn" title="View Events" onClick={() => setSelectedArchiveVenue(selectedArchiveVenue?.id === v.id ? null : v)} style={{ background: selectedArchiveVenue?.id === v.id ? "#EEF2FF" : "transparent" }}>🎭</button>
                       <button className="icon-btn" onClick={() => { setModalVenue(v); setModalMode("edit"); }} title="Edit">✎</button>
                       <button className="icon-btn danger" onClick={() => { if (confirm(`Delete "${v.name}"?`)) deleteArchivedVenue(v.id); }} title="Delete">✕</button>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {selectedArchiveVenue && (
+            <div style={{ marginTop: 16, background: "#FFF", border: "1px solid #E2E8F0", borderRadius: 4, padding: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>Events · {selectedArchiveVenue.name}</div>
+                {eventArchive[String(selectedArchiveVenue.id)]?.scrapedAt && (
+                  <span style={{ fontSize: 10, color: "#94A3B8" }}>cached {new Date(eventArchive[String(selectedArchiveVenue.id)].scrapedAt).toLocaleString()}</span>
+                )}
+                <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={() => scrapeSingleVenue(selectedArchiveVenue)} title="Scrape Events">↻</button>
+                <button className="icon-btn" onClick={() => setSelectedArchiveVenue(null)} title="Close">✕</button>
+              </div>
+              {(eventArchive[String(selectedArchiveVenue.id)]?.events || []).length === 0 ? (
+                <div style={{ fontSize: 12, color: "#64748B", padding: 20, textAlign: "center" }}>No events cached. Click ↻ to fetch.</div>
+              ) : (
+                <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                  {(eventArchive[String(selectedArchiveVenue.id)]?.events || []).map((ev, i) => (
+                    <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid #E2E8F0" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ fontWeight: 500, color: "#0F172A" }}>{ev.title}</div>
+                        <div style={{ fontSize: 11, color: "#2563EB" }}>{ev.date} {ev.time}</div>
+                      </div>
+                      {ev.description && <div style={{ fontSize: 11, color: "#64748B" }}>{ev.description}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

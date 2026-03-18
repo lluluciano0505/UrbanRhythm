@@ -1,0 +1,375 @@
+
+> philly-cultural-radar@1.0.0 server
+> node server.js
+
+[dotenv@17.3.1] injecting env (3) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+
+🕷️  AI Agent Scraper running on http://localhost:3333
+   POST /api/scrape-venue  — Scrape one venue
+   POST /api/scrape-batch  — Scrape multiple venues
+   GET  /api/health        — Health check
+   Model: openai/gpt-4-turbo
+   API Key: ✅ configured
+
+
+==================================================
+🕷️  Scrape request: The Fillmore Philadelphia
+   URL:  https://www.fillmorephilly.com/
+   Type: music_venue
+==================================================
+  [Agent] Fetching: https://www.fillmorephilly.com/
+  [Agent] Page cleaned: 42 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: The Fillmore Philadelphia
+   URL:  https://www.fillmorephilly.com/
+   Type: music_venue
+==================================================
+  [Agent] Fetching: https://www.fillmorephilly.com/
+  [Agent] Page cleaned: 42 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: SOUTH Restaurant & Jazz Club
+   URL:  https://www.southjazzkitchen.com/
+   Type: bar
+==================================================
+  [Agent] Fetching: https://www.southjazzkitchen.com/
+
+==================================================
+🕷️  Scrape request: Chris' Jazz Cafe
+   URL:  http://chrisjazzcafe.com/
+   Type: bar
+==================================================
+  [Agent] Fetching: http://chrisjazzcafe.com/
+
+==================================================
+🕷️  Scrape request: Time
+   URL:  https://www.timerestaurant.net/
+   Type: bar
+==================================================
+  [Agent] Fetching: https://www.timerestaurant.net/
+
+==================================================
+🕷️  Scrape request: Philadelphia Clef Club of Jazz and Performing Arts
+   URL:  http://clefclubofjazz.org/
+   Type: establishment
+==================================================
+  [Agent] Fetching: http://clefclubofjazz.org/
+  [Agent] Page cleaned: 42 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] Page cleaned: 2346 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] Page cleaned: 3225 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] Page cleaned: 5339 chars, 9 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: Solar Myth
+   URL:  http://www.solarmythbar.com/
+   Type: bar
+==================================================
+  [Agent] Fetching: http://www.solarmythbar.com/
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: Gerald Veasley's Unscripted Jazz Series at South Jazz Club
+   URL:  http://www.geraldveasley.com/
+   Type: bar
+==================================================
+  [Agent] Fetching: http://www.geraldveasley.com/
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: World Cafe Live
+   URL:  http://worldcafelive.com/
+   Type: bar
+==================================================
+  [Agent] Fetching: http://worldcafelive.com/
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: Ortlieb's
+   URL:  http://www.ortliebsphilly.com/
+   Type: bar
+==================================================
+  [Agent] Fetching: http://www.ortliebsphilly.com/
+  [Agent] Page cleaned: 3205 chars, 2 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+  [Agent] Page cleaned: 1861 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] Page cleaned: 2521 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+  [Agent] Page cleaned: 1208 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: Parkway Central Library
+   URL:  https://libwww.freelibrary.org/locations/
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/
+
+==================================================
+🕷️  Scrape request: Independence Library
+   URL:  https://libwww.freelibrary.org/locations/independence-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/independence-library
+
+==================================================
+🕷️  Scrape request: South Philadelphia Library
+   URL:  https://libwww.freelibrary.org/locations/south-philadelphia-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/south-philadelphia-library
+
+==================================================
+🕷️  Scrape request: Philadelphia City Institute
+   URL:  https://libwww.freelibrary.org/locations/philadelphia-city-institute
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/philadelphia-city-institute
+❌ Agent error: HTTP 403 Forbidden
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Library Company of Philadelphia
+   URL:  http://www.librarycompany.org/
+   Type: establishment
+==================================================
+  [Agent] Fetching: http://www.librarycompany.org/
+
+==================================================
+🕷️  Scrape request: Charles Santore Library
+   URL:  https://libwww.freelibrary.org/locations/charles-santore-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/charles-santore-library
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Queen Memorial Library
+   URL:  https://libwww.freelibrary.org/locations/queen-memorial-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/queen-memorial-library
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Business Resource and Innovation Center at the Free Library of Philadelphia
+   URL:  http://freelibrary.org/bric
+   Type: establishment
+==================================================
+  [Agent] Fetching: http://freelibrary.org/bric
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Walnut Street West Library
+   URL:  https://libwww.freelibrary.org/locations/walnut-street-west-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/walnut-street-west-library
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Whitman Library
+   URL:  https://libwww.freelibrary.org/locations/whitman-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/whitman-library
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Art Department of the Free Library of Philadelphia
+   URL:  https://libwww.freelibrary.org/locations/departments/art-department
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/departments/art-department
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Ramonita G. de Rodriguez Library
+   URL:  https://libwww.freelibrary.org/locations/ramonita-g-de-rodriguez-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/ramonita-g-de-rodriguez-library
+❌ Agent error: HTTP 403 Forbidden
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Cecil B. Moore Library
+   URL:  https://libwww.freelibrary.org/locations/cecil-b-moore-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/cecil-b-moore-library
+
+==================================================
+🕷️  Scrape request: Charles L. Durham Library
+   URL:  https://libwww.freelibrary.org/locations/charles-l-durham-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/charles-l-durham-library
+❌ Agent error: HTTP 403 Forbidden
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Widener Library
+   URL:  https://libwww.freelibrary.org/locations/widener-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/widener-library
+
+==================================================
+🕷️  Scrape request: Foundation Board of the Free Library
+   URL:  http://www.freelibrary.org/
+   Type: establishment
+==================================================
+  [Agent] Fetching: http://www.freelibrary.org/
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Lucien E. Blackwell West Philadelphia Regional Library
+   URL:  https://libwww.freelibrary.org/locations/lucien-e-blackwell-west-philadelphia-regional-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/lucien-e-blackwell-west-philadelphia-regional-library
+❌ Agent error: HTTP 403 Forbidden
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Fishtown Community Library
+   URL:  https://libwww.freelibrary.org/locations/fishtown-community-library
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://libwww.freelibrary.org/locations/fishtown-community-library
+
+==================================================
+🕷️  Scrape request: Scott Memorial Library at Thomas Jefferson University
+   URL:  http://library.jefferson.edu/
+   Type: establishment
+==================================================
+  [Agent] Fetching: http://library.jefferson.edu/
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: Library Hall
+   URL:  https://www.amphilsoc.org/museum/exhibitions/heart-philadelphia-story-library-hall
+   Type: establishment
+==================================================
+  [Agent] Fetching: https://www.amphilsoc.org/museum/exhibitions/heart-philadelphia-story-library-hall
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: The Book Trader
+   URL:  http://www.phillybooktrader.com/
+   Type: book_store
+==================================================
+  [Agent] Fetching: http://www.phillybooktrader.com/
+❌ Agent error: HTTP 403 Forbidden
+
+==================================================
+🕷️  Scrape request: A Novel Idea on Passyunk
+   URL:  http://www.anovelideaphilly.com/
+   Type: book_store
+==================================================
+  [Agent] Fetching: http://www.anovelideaphilly.com/
+  [Agent] Page cleaned: 42 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] Page cleaned: 793 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: House of Our Own Books
+   URL:  http://www.biblio.com/bookstore/house_of_our_own_philadelphia
+   Type: book_store
+==================================================
+  [Agent] Fetching: http://www.biblio.com/bookstore/house_of_our_own_philadelphia
+
+==================================================
+🕷️  Scrape request: Book Corner
+   URL:  https://www.facebook.com/bookcornerphilly/
+   Type: book_store
+==================================================
+  [Agent] Fetching: https://www.facebook.com/bookcornerphilly/
+  [Agent] Page cleaned: 4078 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+❌ Agent error: HTTP 400 Bad Request
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+❌ Agent error: HTTP 403 Forbidden
+  [Agent] Page cleaned: 1781 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+
+==================================================
+🕷️  Scrape request: Test Venue
+   URL:  https://www.example.com/
+   Type: music_venue
+==================================================
+  [Agent] Fetching: https://www.example.com/
+  [Agent] Page cleaned: 167 chars, 0 event-related links
+  [Agent] Calling LLM to extract events...
+  [Agent] LLM extraction error: OpenRouter API error 405: 
+✅ Done: 0 events found
+   Notes: Error: OpenRouter API error 405: 
+ReferenceError: ANTHROPIC_API_KEY is not defined
+    at file:///Users/luchieeoo/Documents/GitHub/UrbanRhythm/server.js:381:18
+    at Layer.handleRequest (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/layer.js:152:17)
+    at next (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/route.js:157:13)
+    at Route.dispatch (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/route.js:117:3)
+    at handle (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:435:11)
+    at Layer.handleRequest (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/layer.js:152:17)
+    at /Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:295:15
+    at processParams (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:582:12)
+    at next (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:291:5)
+    at read (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/body-parser/lib/read.js:53:5)
+ReferenceError: ANTHROPIC_API_KEY is not defined
+    at file:///Users/luchieeoo/Documents/GitHub/UrbanRhythm/server.js:381:18
+    at Layer.handleRequest (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/layer.js:152:17)
+    at next (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/route.js:157:13)
+    at Route.dispatch (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/route.js:117:3)
+    at handle (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:435:11)
+    at Layer.handleRequest (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/lib/layer.js:152:17)
+    at /Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:295:15
+    at processParams (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:582:12)
+    at next (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/router/index.js:291:5)
+    at read (/Users/luchieeoo/Documents/GitHub/UrbanRhythm/node_modules/body-parser/lib/read.js:53:5)
