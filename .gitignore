@@ -1,0 +1,32 @@
+# Environment variables - NEVER commit real keys!
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+dist/
+.next/
+.nuxt/
+
+# Misc
+.DS_Store
+*.log
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.iml
+.cache/
+
+# Vite
+.vite/

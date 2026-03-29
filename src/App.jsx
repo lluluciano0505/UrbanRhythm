@@ -6,6 +6,9 @@ const LAYER_NAMES = ["Geo-Indexing", "Event Scraping", "Data Archive", "Venue Da
 const GOOGLE_MAPS_LIBRARIES = ["places"];
 const STORAGE_KEY = "venue-archive-db";
 const EVENT_STORAGE_KEY = "event-archive-db";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3333";
+const API_SECRET = import.meta.env.VITE_API_SECRET || "";
+const authHeaders = () => ({ "Content-Type": "application/json", "x-api-key": API_SECRET });
 
 // ═══════════════════════════════════════════════════════════════
 //  PERSISTENT VENUE ARCHIVE — replaces hardcoded seed list
@@ -78,57 +81,20 @@ const makeId = () => `v_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 // ═══════════════════════════════════════════════════════════════
 
 async function generateSearchPlan(userQuery) {
-  const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "";
   const fallbackPlan = {
     queries: [userQuery.toLowerCase().includes("philadelphia") ? userQuery : `${userQuery} Philadelphia`],
     placeTypes: [],
     seedTags: userQuery.toLowerCase().split(/\s+/)
   };
 
-  if (!openRouterApiKey) return fallbackPlan;
-
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(`${BACKEND_URL}/api/search-plan`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openRouterApiKey}` },
-      body: JSON.stringify({
-        model: "openai/gpt-4-turbo",
-        temperature: 0.3,
-        max_tokens: 400,
-        messages: [{
-          role: "user",
-          content: `You are a search strategy planner for finding venues in Philadelphia.
-
-User query: "${userQuery}"
-
-Generate a search plan as JSON with these fields:
-1. "queries" — array of 3-5 different Google Maps text search queries (each max 6 words, must include "Philadelphia"). Cover different angles:
-   - Direct interpretation
-   - Related venue types
-   - Neighborhood-specific
-   - Broader category
-
-2. "placeTypes" — array of Google Places type strings relevant to the intent. Valid types include: bar, night_club, restaurant, cafe, museum, art_gallery, library, park, stadium, movie_theater, performing_arts_theater, book_store, bowling_alley, gym, amusement_park, tourist_attraction.
-   Pick 2-4 that best match.
-
-3. "seedTags" — array of 3-6 lowercase keywords to match against a local venue database tags. Think about what tags a relevant venue might have.
-
-Return ONLY valid JSON, no markdown fences.`
-        }]
-      })
+      headers: authHeaders(),
+      body: JSON.stringify({ query: userQuery })
     });
-
     if (!response.ok) return fallbackPlan;
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
-    if (!content) return fallbackPlan;
-
-    const plan = JSON.parse(content.replace(/```json|```/g, "").trim());
-    return {
-      queries: Array.isArray(plan.queries) ? plan.queries.slice(0, 5) : fallbackPlan.queries,
-      placeTypes: Array.isArray(plan.placeTypes) ? plan.placeTypes.slice(0, 4) : [],
-      seedTags: Array.isArray(plan.seedTags) ? plan.seedTags.slice(0, 6) : fallbackPlan.seedTags
-    };
+    return await response.json();
   } catch (error) {
     console.error("Search plan error:", error.message);
     return fallbackPlan;
@@ -257,44 +223,17 @@ async function enrichWithDetails(rawPlaces, placesService) {
 
 async function filterVenuesByIntent(query, venues) {
   if (!venues.length) return venues;
-  const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "";
-  if (!openRouterApiKey) return venues;
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(`${BACKEND_URL}/api/filter-venues`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openRouterApiKey}` },
-      body: JSON.stringify({
-        model: "openai/gpt-4-turbo",
-        temperature: 0.2,
-        max_tokens: 800,
-        messages: [{
-          role: "user",
-          content: `You are a strict relevance filter for venue search results in Philadelphia.
-
-User query: "${query}"
-
-IMPORTANT:
-- A venue does NOT need the keyword in its name. A bar that hosts live music IS a concert venue.
-- Include venues that COULD reasonably host or relate to the queried activity.
-- When in doubt, INCLUDE rather than exclude.
-
-Places (id | name | type | address):
-${venues.map(v => `${v.id} | ${v.name} | ${v.type} | ${v.address}`).join("\n")}
-
-Return ONLY JSON array of relevant ids: ["id1","id2"]`
-        }]
-      })
+      headers: authHeaders(),
+      body: JSON.stringify({ query, venues })
     });
-
     if (!response.ok) return venues;
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return venues;
-
-    const ids = JSON.parse(content.replace(/```json|```/g, "").trim());
-    if (!Array.isArray(ids) || !ids.length) return venues;
-    const idSet = new Set(ids.map(String));
+    if (!data.ids) return venues;
+    const idSet = new Set(data.ids);
     const filtered = venues.filter(v => idSet.has(String(v.id)));
     return filtered.length > 0 ? filtered : venues;
   } catch {
@@ -360,9 +299,9 @@ async function scrapeVenueEvents(venue) {
   console.log(`🕷️  Scraping ${venue.name}: ${venue.website}`);
 
   try {
-    const response = await fetch("http://localhost:3333/api/scrape-venue", {
+    const response = await fetch(`${BACKEND_URL}/api/scrape-venue`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({
         name: venue.name,
         website: venue.website || "",
@@ -382,7 +321,7 @@ async function scrapeVenueEvents(venue) {
     return events;
   } catch (err) {
     console.error(`❌ Failed to scrape ${venue.name}:`, err.message);
-    console.error(`   Is backend running on http://localhost:3333?`);
+    console.error(`   Is backend running on ${BACKEND_URL}?`);
     // 如果后端不可用，返回空
     return [];
   }

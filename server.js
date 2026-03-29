@@ -6,7 +6,8 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3333;
-const OPENROUTER_KEY = process.env.VITE_OPENROUTER_API_KEY;
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+const API_SECRET = process.env.VITE_API_SECRET;
 
 // Models
 const EXTRACT_MODEL = "openai/gpt-4o-mini";   // fast + cheap for structured extraction
@@ -14,6 +15,18 @@ const SEARCH_MODEL  = "perplexity/sonar";      // has live web search built-in
 
 app.use(cors());
 app.use(express.json());
+
+// ════════════════════════════════════════════════════════════════
+//  AUTH MIDDLEWARE
+// ════════════════════════════════════════════════════════════════
+app.use((req, res, next) => {
+  if (req.path === "/api/health") return next(); // health check is public
+  if (!API_SECRET) return next();               // secret not configured — skip in dev
+  if (req.headers["x-api-key"] !== API_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+});
 
 // ════════════════════════════════════════════════════════════════
 //  LOGGING
@@ -57,8 +70,20 @@ async function fetchWithJina(url, timeoutMs = 25000) {
 // ════════════════════════════════════════════════════════════════
 //  OPENROUTER LLM CALL
 // ════════════════════════════════════════════════════════════════
-async function callLLM(systemPrompt, userMessage, model = EXTRACT_MODEL) {
-  if (!OPENROUTER_KEY) throw new Error("No VITE_OPENROUTER_API_KEY in .env");
+async function callLLM(systemPrompt, userMessage, model = EXTRACT_MODEL, options = {}) {
+  if (!OPENROUTER_KEY) throw new Error("No OPENROUTER_API_KEY in .env");
+
+  const { responseFormat, temperature = 0.1, max_tokens = 4000 } = options;
+  const body = {
+    model,
+    temperature,
+    max_tokens,
+    messages: [
+      ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+      { role: "user", content: userMessage },
+    ],
+    ...(responseFormat ? { response_format: responseFormat } : {}),
+  };
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -68,15 +93,7 @@ async function callLLM(systemPrompt, userMessage, model = EXTRACT_MODEL) {
       "HTTP-Referer": "http://localhost:3333",
       "X-Title": "PhillyCulturalRadar",
     },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      max_tokens: 4000,
-      messages: [
-        ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-        { role: "user", content: userMessage },
-      ],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -92,8 +109,9 @@ async function callLLM(systemPrompt, userMessage, model = EXTRACT_MODEL) {
 //  EXTRACTION SYSTEM PROMPT
 // ════════════════════════════════════════════════════════════════
 function extractionPrompt(venueName, venueType) {
-  const today = new Date().toISOString().split("T")[0];
-  const year = new Date().getFullYear();
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const year = now.getFullYear();
 
   return `You are an expert event extractor. You read webpage content (in Markdown) and find upcoming events.
 
@@ -111,32 +129,57 @@ RULES:
 8. Max 25 events.
 9. Ignore navigation text, ads, footer links — only real events.
 
-OUTPUT: ONLY a JSON array. No markdown fences, no explanation, no preamble.
-If no events found, output exactly: []
+OUTPUT: ONLY a JSON object with one key: "events".
+No markdown fences, no explanation, no preamble.
+If no events found, output exactly: {"events":[]}
 
 Example output:
-[{"title":"Jazz Night","date":"${year}-04-15","time":"8:00 PM","category":"Music","description":"Live jazz quartet performance","free":false,"event_url":"https://example.com/jazz-night"}]`;
+{"events":[{"title":"Jazz Night","date":"${year}-04-15","time":"8:00 PM","category":"Music","description":"Live jazz quartet performance","free":false,"event_url":"https://example.com/jazz-night"}]}`;
 }
 
 // ════════════════════════════════════════════════════════════════
 //  PARSE LLM RESPONSE → EVENTS ARRAY
 // ════════════════════════════════════════════════════════════════
 function parseEvents(raw, venueName, url) {
-  if (!raw) return [];
+  if (!raw) {
+    return { events: [], error: "Empty model response" };
+  }
+
   try {
     let clean = raw.trim();
     // Strip markdown fences
     if (clean.startsWith("```")) {
       clean = clean.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
     }
-    // Find the array
-    const match = clean.match(/\[[\s\S]*\]/);
-    if (!match) return [];
 
-    const arr = JSON.parse(match[0]);
-    if (!Array.isArray(arr)) return [];
+    let arr = null;
 
-    return arr
+    // Preferred: parse entire JSON payload (supports {"events":[...]})
+    try {
+      const parsedWhole = JSON.parse(clean);
+      if (Array.isArray(parsedWhole)) {
+        arr = parsedWhole;
+      } else if (parsedWhole && Array.isArray(parsedWhole.events)) {
+        arr = parsedWhole.events;
+      }
+    } catch {
+      // Fallback below
+    }
+
+    // Fallback: try to recover a JSON array from mixed text
+    if (!arr) {
+      const match = clean.match(/\[[\s\S]*\]/);
+      if (!match) {
+        return { events: [], error: "No JSON array found in model response" };
+      }
+      const recovered = JSON.parse(match[0]);
+      if (!Array.isArray(recovered)) {
+        return { events: [], error: "Parsed JSON is not an array" };
+      }
+      arr = recovered;
+    }
+
+    const events = arr
       .filter((e) => e && e.title && (e.date || e.time))
       .map((e) => ({
         title: String(e.title || "").slice(0, 200),
@@ -149,23 +192,98 @@ function parseEvents(raw, venueName, url) {
         url,
         event_url: String(e.event_url || ""),
       }));
+
+    return { events, error: null };
   } catch (err) {
     L("Parse", `JSON error: ${err.message}`);
-    return [];
+    return { events: [], error: `JSON parse failed: ${err.message}` };
   }
+}
+
+function dedupeEvents(events) {
+  const seen = new Set();
+  const deduped = [];
+
+  for (const e of events) {
+    const key = [
+      String(e.title || "").toLowerCase().trim(),
+      String(e.date || "").toLowerCase().trim(),
+      String(e.time || "").toLowerCase().trim(),
+      String(e.event_url || "").toLowerCase().trim(),
+    ].join("|");
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(e);
+    }
+  }
+
+  return deduped;
+}
+
+function extractEventDenseMarkdown(markdown, maxBlocks = 14) {
+  const blocks = markdown
+    .split(/\n{2,}/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) return "";
+
+  const dateRegex = /(\b\d{4}-\d{2}-\d{2}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b)/i;
+  const keywordRegex = /(event|calendar|show|concert|performance|exhibit|festival|workshop|lecture|ticket|lineup|upcoming)/i;
+  const timeRegex = /(\b\d{1,2}:\d{2}\s?(?:am|pm)\b|\b\d{1,2}\s?(?:am|pm)\b)/i;
+
+  const scored = blocks.map((text, idx) => {
+    let score = 0;
+    if (dateRegex.test(text)) score += 3;
+    if (keywordRegex.test(text)) score += 2;
+    if (timeRegex.test(text)) score += 1;
+    if (text.length > 120 && text.length < 2200) score += 1;
+    return { idx, text, score };
+  });
+
+  const top = scored
+    .filter((b) => b.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxBlocks)
+    .sort((a, b) => a.idx - b.idx)
+    .map((b) => b.text);
+
+  return top.join("\n\n");
+}
+
+function chunkText(text, chunkSize = 6500, overlap = 600) {
+  if (!text) return [];
+  if (text.length <= chunkSize) return [text];
+
+  const chunks = [];
+  let start = 0;
+
+  while (start < text.length) {
+    const end = Math.min(start + chunkSize, text.length);
+    chunks.push(text.slice(start, end));
+    if (end >= text.length) break;
+    start = Math.max(end - overlap, start + 1);
+  }
+
+  return chunks;
+}
+
+function buildExtractionChunks(markdown, maxChunks = 4) {
+  const dense = extractEventDenseMarkdown(markdown);
+  const source = dense.length >= 1200 ? dense : markdown;
+  return chunkText(source, 6500, 600).slice(0, maxChunks);
 }
 
 // ════════════════════════════════════════════════════════════════
 //  FIND EVENT-RELATED LINKS from Jina's link map or markdown
 // ════════════════════════════════════════════════════════════════
+const EVENT_LINK_RE = /event|calendar|schedule|show|concert|program|what.?s.?on|happen|perform|exhibit|upcoming|ticket|lineup|season/i;
+const isEventLink = (text, href) => EVENT_LINK_RE.test(text + " " + href);
+
 function findEventLinks(markdown, jinaLinks, baseUrl) {
   const found = [];
   const seen = new Set();
-
-  const isEventLink = (text, href) => {
-    const t = (text + " " + href).toLowerCase();
-    return /event|calendar|schedule|show|concert|program|what.?s.?on|happen|perform|exhibit|upcoming|ticket|lineup|season/i.test(t);
-  };
 
   // From Jina's structured links object: { "Link Text": "url", ... }
   if (jinaLinks && typeof jinaLinks === "object") {
@@ -200,6 +318,65 @@ function findEventLinks(markdown, jinaLinks, baseUrl) {
 }
 
 // ════════════════════════════════════════════════════════════════
+//  VENUE PAGE VALIDATOR
+//  Checks that scraped content actually belongs to the expected venue.
+//  Uses a fast string heuristic first; falls back to LLM only when ambiguous.
+//  Returns { match: bool, confidence: 0-1, reason: string }
+// ════════════════════════════════════════════════════════════════
+async function validateVenuePage(markdown, venueName) {
+  const sample = markdown.slice(0, 2000);
+  const sampleLower = sample.toLowerCase();
+
+  // Tokenise venue name — only words longer than 3 chars are meaningful
+  const nameParts = venueName.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  if (nameParts.length === 0) {
+    return { match: true, confidence: 0.5, reason: "name too short to validate" };
+  }
+
+  const hits = nameParts.filter((w) => sampleLower.includes(w)).length;
+  const score = hits / nameParts.length;
+
+  // Clear pass — majority of name words present
+  if (score >= 0.6) {
+    L("Validate", `✅ "${venueName}" — name match ${hits}/${nameParts.length} words`);
+    return { match: true, confidence: score, reason: `name match (${hits}/${nameParts.length} words)` };
+  }
+
+  // Clear fail — none of the name words appear at all
+  if (hits === 0) {
+    L("Validate", `❌ "${venueName}" — venue name absent from page`);
+    return { match: false, confidence: 0.85, reason: "venue name absent from page content" };
+  }
+
+  // Ambiguous — partial match, ask the LLM to decide
+  L("Validate", `⚠️  "${venueName}" — partial match (${hits}/${nameParts.length}), asking LLM`);
+  try {
+    const response = await callLLM(
+      null,
+      `Does this web page belong to the venue "${venueName}" in Philadelphia, PA?
+
+Page excerpt:
+${sample}
+
+Reply with JSON only: { "match": true/false, "confidence": 0.0-1.0, "reason": "one sentence" }
+Return match:false if this is a different venue, a different city's branch, or a corporate parent site unrelated to this specific location.`,
+      EXTRACT_MODEL,
+      { responseFormat: { type: "json_object" } }
+    );
+    const r = JSON.parse(response);
+    L("Validate", `LLM → match=${r.match} (${r.confidence}) — ${r.reason}`);
+    return {
+      match: Boolean(r.match),
+      confidence: Number(r.confidence) || 0.5,
+      reason: r.reason || "",
+    };
+  } catch {
+    // On error be permissive — don't silently drop legitimate scrapes
+    return { match: true, confidence: 0.5, reason: "validation error — permissive fallback" };
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 //  STRATEGY A: JINA FETCH → LLM EXTRACTION
 //  Jina renders JS, returns Markdown. LLM reads it intelligently.
 // ════════════════════════════════════════════════════════════════
@@ -209,30 +386,60 @@ async function strategyA(url, venueName, venueType) {
   const { markdown, links: jinaLinks, ok, error } = await fetchWithJina(url);
   if (!ok) {
     L("A", `Jina failed: ${error}`);
-    return { events: [], eventLinks: [], markdown: "" };
+    return { events: [], eventLinks: [], markdown: "", mismatch: false };
+  }
+
+  // Validate this page actually belongs to the expected venue
+  const validation = await validateVenuePage(markdown, venueName);
+  if (!validation.match && validation.confidence >= 0.7) {
+    L("A", `❌ Page mismatch (conf=${validation.confidence.toFixed(2)}): ${validation.reason}`);
+    return { events: [], eventLinks: [], markdown, mismatch: true, parseError: `Page mismatch: ${validation.reason}` };
   }
 
   // Find event-related links (for Strategy B if needed)
   const eventLinks = findEventLinks(markdown, jinaLinks, url);
   L("A", `Found ${eventLinks.length} event-related links`);
 
-  // Truncate to keep LLM costs down
-  const truncated = markdown.slice(0, 10000);
+  const chunks = buildExtractionChunks(markdown, 4);
+  const parseErrors = [];
+  let allEvents = [];
 
   try {
-    L("A", `Sending ${truncated.length} chars to ${EXTRACT_MODEL}...`);
-    const llmResponse = await callLLM(
-      extractionPrompt(venueName, venueType),
-      `Extract all upcoming events from this webpage content:\n\n${truncated}`
-    );
-    L("A", `LLM response: ${llmResponse.length} chars`);
+    if (!chunks.length) {
+      return { events: [], eventLinks, markdown, parseError: "No markdown content to extract" };
+    }
 
-    const events = parseEvents(llmResponse, venueName, url);
-    L("A", `→ ${events.length} events`);
-    return { events, eventLinks, markdown };
+    for (let i = 0; i < chunks.length; i += 1) {
+      const chunk = chunks[i];
+      L("A", `Chunk ${i + 1}/${chunks.length}: ${chunk.length} chars → ${EXTRACT_MODEL}`);
+
+      const llmResponse = await callLLM(
+        extractionPrompt(venueName, venueType),
+        `Extract all upcoming events from this webpage chunk ${i + 1}/${chunks.length}.\n\n${chunk}`,
+        EXTRACT_MODEL,
+        { responseFormat: { type: "json_object" } }
+      );
+
+      const parsed = parseEvents(llmResponse, venueName, url);
+      if (parsed.error) {
+        parseErrors.push(`chunk ${i + 1}: ${parsed.error}`);
+        L("A", `Parse warning: ${parsed.error}`);
+      }
+
+      allEvents.push(...parsed.events);
+    }
+
+    allEvents = dedupeEvents(allEvents).slice(0, 25);
+    L("A", `→ ${allEvents.length} events`);
+    return {
+      events: allEvents,
+      eventLinks,
+      markdown,
+      parseError: parseErrors.length ? parseErrors.join(" | ") : null,
+    };
   } catch (err) {
     L("A", `LLM error: ${err.message}`);
-    return { events: [], eventLinks, markdown };
+    return { events: [], eventLinks, markdown, parseError: null };
   }
 }
 
@@ -246,6 +453,7 @@ async function strategyB(baseUrl, venueName, venueType, knownLinks = []) {
   const origin = new URL(baseUrl).origin;
   const seen = new Set([baseUrl]);
   const candidates = [];
+  const parseErrors = [];
 
   // Priority 1: event links found on main page
   for (const link of knownLinks.slice(0, 5)) {
@@ -275,19 +483,42 @@ async function strategyB(baseUrl, venueName, venueType, knownLinks = []) {
     const { markdown, ok } = await fetchWithJina(c.url, 15000);
     if (!ok || markdown.length < 100) continue;
 
-    const truncated = markdown.slice(0, 10000);
+    // Validate sub-page belongs to the expected venue before burning extraction tokens
+    const validation = await validateVenuePage(markdown, venueName);
+    if (!validation.match && validation.confidence >= 0.7) {
+      L("B", `❌ Sub-page mismatch: ${validation.reason}`);
+      continue;
+    }
+
+    const chunks = buildExtractionChunks(markdown, 2);
 
     try {
-      L("B", `Sending ${truncated.length} chars to LLM...`);
-      const llmResponse = await callLLM(
-        extractionPrompt(venueName, venueType),
-        `Extract events from this sub-page (${c.url}):\n\n${truncated}`
-      );
+      if (!chunks.length) continue;
 
-      const events = parseEvents(llmResponse, venueName, c.url);
+      let events = [];
+      for (let i = 0; i < chunks.length; i += 1) {
+        const chunk = chunks[i];
+        L("B", `Chunk ${i + 1}/${chunks.length}: ${chunk.length} chars from ${c.url}`);
+
+        const llmResponse = await callLLM(
+          extractionPrompt(venueName, venueType),
+          `Extract events from this sub-page (${c.url}), chunk ${i + 1}/${chunks.length}:\n\n${chunk}`,
+          EXTRACT_MODEL,
+          { responseFormat: { type: "json_object" } }
+        );
+
+        const parsed = parseEvents(llmResponse, venueName, c.url);
+        if (parsed.error) {
+          parseErrors.push(`${c.url} chunk ${i + 1}: ${parsed.error}`);
+          L("B", `Parse warning: ${parsed.error}`);
+        }
+        events.push(...parsed.events);
+      }
+
+      events = dedupeEvents(events).slice(0, 25);
       if (events.length > 0) {
         L("B", `✅ ${events.length} events from ${c.url}`);
-        return { events, source: c.url };
+        return { events, source: c.url, parseError: parseErrors.length ? parseErrors.join(" | ") : null };
       }
     } catch (err) {
       L("B", `LLM error: ${err.message}`);
@@ -295,7 +526,11 @@ async function strategyB(baseUrl, venueName, venueType, knownLinks = []) {
   }
 
   L("B", "No events on sub-pages");
-  return { events: [], source: null };
+  return {
+    events: [],
+    source: null,
+    parseError: parseErrors.length ? parseErrors.join(" | ") : null,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -303,11 +538,12 @@ async function strategyB(baseUrl, venueName, venueType, knownLinks = []) {
 //  Completely independent — searches the web for venue events.
 //  Doesn't need Jina or HTML at all.
 // ════════════════════════════════════════════════════════════════
-async function strategyC(venueName, venueType, websiteUrl) {
+async function strategyC(venueName, websiteUrl) {
   L("C", `Perplexity search: "${venueName}"`);
 
-  const today = new Date().toISOString().split("T")[0];
-  const year = new Date().getFullYear();
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const year = now.getFullYear();
 
   const prompt = `Search the web and find upcoming events at "${venueName}" in Philadelphia, PA.
 Their website is: ${websiteUrl}
@@ -332,12 +568,14 @@ If you can't find any events, return exactly: []`;
   try {
     const response = await callLLM(null, prompt, SEARCH_MODEL);
     L("C", `Perplexity response: ${response.length} chars`);
-    const events = parseEvents(response, venueName, websiteUrl);
+    const parsed = parseEvents(response, venueName, websiteUrl);
+    if (parsed.error) L("C", `Parse warning: ${parsed.error}`);
+    const events = parsed.events;
     L("C", `→ ${events.length} events`);
-    return { events };
+    return { events, parseError: parsed.error };
   } catch (err) {
     L("C", `Perplexity error: ${err.message}`);
-    return { events: [] };
+    return { events: [], parseError: null };
   }
 }
 
@@ -347,22 +585,35 @@ If you can't find any events, return exactly: []`;
 async function scrapeVenue(url, venueName, venueType) {
   L("Main", `━━━ "${venueName}" → ${url}`);
   const t0 = Date.now();
+  const parseErrors = [];
 
   // ── Strategy A: Jina + LLM on main page ──
   try {
     const a = await strategyA(url, venueName, venueType);
+    if (a.parseError) parseErrors.push(`A: ${a.parseError}`);
     if (a.events.length > 0) {
       L("Main", `✅ A: ${a.events.length} events (${Date.now() - t0}ms)`);
-      return { events: a.events, strategy: "jina-direct" };
+      return {
+        events: a.events,
+        strategy: "jina-direct",
+        parseErrors: parseErrors.length ? parseErrors : undefined,
+      };
     }
 
     // ── Strategy B: Jina + LLM on sub-pages ──
-    if (a.eventLinks.length > 0 || a.markdown.length > 100) {
+    // Skip B if A confirmed the whole domain is wrong (sub-pages share the same domain)
+    if (!a.mismatch && (a.eventLinks.length > 0 || a.markdown.length > 100)) {
       try {
         const b = await strategyB(url, venueName, venueType, a.eventLinks);
+        if (b.parseError) parseErrors.push(`B: ${b.parseError}`);
         if (b.events.length > 0) {
           L("Main", `✅ B: ${b.events.length} events from ${b.source} (${Date.now() - t0}ms)`);
-          return { events: b.events, strategy: "jina-subpage", notes: `Source: ${b.source}` };
+          return {
+            events: b.events,
+            strategy: "jina-subpage",
+            notes: `Source: ${b.source}`,
+            parseErrors: parseErrors.length ? parseErrors : undefined,
+          };
         }
       } catch (err) {
         L("Main", `B error: ${err.message}`);
@@ -374,22 +625,114 @@ async function scrapeVenue(url, venueName, venueType) {
 
   // ── Strategy C: Perplexity web search ──
   try {
-    const c = await strategyC(venueName, venueType, url);
+    const c = await strategyC(venueName, url);
+    if (c.parseError) parseErrors.push(`C: ${c.parseError}`);
     if (c.events.length > 0) {
       L("Main", `✅ C: ${c.events.length} events via Perplexity (${Date.now() - t0}ms)`);
-      return { events: c.events, strategy: "perplexity-search", notes: "Via live web search" };
+      return {
+        events: c.events,
+        strategy: "perplexity-search",
+        notes: "Via live web search",
+        parseErrors: parseErrors.length ? parseErrors : undefined,
+      };
     }
   } catch (err) {
     L("Main", `C error: ${err.message}`);
   }
 
   L("Main", `❌ All strategies empty (${Date.now() - t0}ms)`);
-  return { events: [], strategy: "none", notes: "No events found" };
+  return {
+    events: [],
+    strategy: "none",
+    notes: parseErrors.length ? "No events found (with parse warnings)" : "No events found",
+    parseErrors: parseErrors.length ? parseErrors : undefined,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════
 //  API ENDPOINTS
 // ════════════════════════════════════════════════════════════════
+
+// Generates a multi-query Google Maps search plan from a user query
+app.post("/api/search-plan", async (req, res) => {
+  const { query } = req.body;
+  if (!query?.trim()) return res.status(400).json({ error: "query required" });
+
+  const fallback = {
+    queries: [query.toLowerCase().includes("philadelphia") ? query : `${query} Philadelphia`],
+    placeTypes: [],
+    seedTags: query.toLowerCase().split(/\s+/),
+  };
+
+  try {
+    const content = await callLLM(
+      null,
+      `You are a search strategy planner for finding venues in Philadelphia.
+
+User query: "${query}"
+
+Generate a search plan as JSON with these fields:
+1. "queries" — array of 3-5 different Google Maps text search queries (each max 6 words, must include "Philadelphia"). Cover different angles:
+   - Direct interpretation
+   - Related venue types
+   - Neighborhood-specific
+   - Broader category
+
+2. "placeTypes" — array of Google Places type strings relevant to the intent. Valid types include: bar, night_club, restaurant, cafe, museum, art_gallery, library, park, stadium, movie_theater, performing_arts_theater, book_store, bowling_alley, gym, amusement_park, tourist_attraction.
+   Pick 2-4 that best match.
+
+3. "seedTags" — array of 3-6 lowercase keywords to match against a local venue database tags. Think about what tags a relevant venue might have.
+
+Return ONLY valid JSON, no markdown fences.`,
+      "openai/gpt-4-turbo",
+      { temperature: 0.3, max_tokens: 400 }
+    );
+    const plan = JSON.parse(content.replace(/```json|```/g, "").trim());
+    res.json({
+      queries: Array.isArray(plan.queries) ? plan.queries.slice(0, 5) : fallback.queries,
+      placeTypes: Array.isArray(plan.placeTypes) ? plan.placeTypes.slice(0, 4) : [],
+      seedTags: Array.isArray(plan.seedTags) ? plan.seedTags.slice(0, 6) : fallback.seedTags,
+    });
+  } catch (err) {
+    console.error("search-plan error:", err.message);
+    res.json(fallback);
+  }
+});
+
+// Semantic venue filter — returns only venue IDs relevant to the query
+app.post("/api/filter-venues", async (req, res) => {
+  const { query, venues } = req.body;
+  if (!query || !Array.isArray(venues) || !venues.length) {
+    return res.status(400).json({ error: "query and venues[] required" });
+  }
+
+  try {
+    const content = await callLLM(
+      null,
+      `You are a strict relevance filter for venue search results in Philadelphia.
+
+User query: "${query}"
+
+IMPORTANT:
+- A venue does NOT need the keyword in its name. A bar that hosts live music IS a concert venue.
+- Include venues that COULD reasonably host or relate to the queried activity.
+- When in doubt, INCLUDE rather than exclude.
+
+Places (id | name | type | address):
+${venues.map((v) => `${v.id} | ${v.name} | ${v.type} | ${v.address}`).join("\n")}
+
+Return ONLY JSON array of relevant ids: ["id1","id2"]`,
+      "openai/gpt-4-turbo",
+      { temperature: 0.2, max_tokens: 800 }
+    );
+    const ids = JSON.parse(content.replace(/```json|```/g, "").trim());
+    if (!Array.isArray(ids) || !ids.length) return res.json({ ids: null });
+    res.json({ ids: ids.map(String) });
+  } catch (err) {
+    console.error("filter-venues error:", err.message);
+    res.json({ ids: null }); // frontend falls back to unfiltered on null
+  }
+});
 
 app.post("/api/scrape-venue", async (req, res) => {
   const { name, website, type } = req.body;
@@ -406,7 +749,12 @@ app.post("/api/scrape-venue", async (req, res) => {
   try {
     const result = await scrapeVenue(website, name, type);
     console.log(`✅ ${result.events.length} events [${result.strategy}]\n`);
-    res.json({ events: result.events, notes: result.notes, strategy: result.strategy });
+    res.json({
+      events: result.events,
+      notes: result.notes,
+      strategy: result.strategy,
+      parseErrors: result.parseErrors,
+    });
   } catch (err) {
     console.error(`❌ Fatal:`, err);
     res.status(500).json({ events: [], debug: err.message });
@@ -426,11 +774,7 @@ app.post("/api/scrape-batch", async (req, res) => {
   for (let i = 0; i < venues.length; i += 2) {
     const batch = venues.slice(i, i + 2);
     const settled = await Promise.allSettled(
-      batch.map((v) =>
-        scrapeVenue(v.website, v.name, v.type).catch((e) => ({
-          events: [], strategy: "error", notes: e.message,
-        }))
-      )
+      batch.map((v) => scrapeVenue(v.website, v.name, v.type))
     );
 
     settled.forEach((r, idx) => {
@@ -442,6 +786,7 @@ app.post("/api/scrape-batch", async (req, res) => {
         events: val.events || [],
         strategy: val.strategy || "error",
         notes: val.notes || "",
+        parseErrors: val.parseErrors,
       });
     });
 
