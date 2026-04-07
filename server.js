@@ -1,6 +1,11 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 dotenv.config();
 
@@ -32,6 +37,42 @@ app.use((req, res, next) => {
 //  LOGGING
 // ════════════════════════════════════════════════════════════════
 const L = (tag, msg) => console.log(`  [${tag}] ${msg}`);
+
+// ════════════════════════════════════════════════════════════════
+//  SEARCH RESULT CACHE — server-side JSON file
+//  Stores venue search results keyed by normalized query.
+//  Each entry: { normalizedQuery, taxonomy, cachedAt, expiresAt, venues[] }
+// ════════════════════════════════════════════════════════════════
+const CACHE_FILE = path.join(__dirname, "cache", "search-cache.json");
+const CACHE_TTL_DAYS = 7;
+
+function ensureCacheDir() {
+  const dir = path.dirname(CACHE_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function readCache() {
+  try {
+    ensureCacheDir();
+    if (!fs.existsSync(CACHE_FILE)) return {};
+    return JSON.parse(fs.readFileSync(CACHE_FILE, "utf8"));
+  } catch { return {}; }
+}
+
+function writeCache(data) {
+  try {
+    ensureCacheDir();
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), "utf8");
+    return true;
+  } catch (err) {
+    L("Cache", `Write failed: ${err.message}`);
+    return false;
+  }
+}
+
+function normalizeQuery(q) {
+  return String(q).toLowerCase().trim().replace(/\s+/g, " ");
+}
 
 // ════════════════════════════════════════════════════════════════
 //  JINA READER — fetches any URL as clean Markdown
@@ -667,31 +708,49 @@ app.post("/api/search-plan", async (req, res) => {
   try {
     const content = await callLLM(
       null,
-      `You are a search strategy planner for finding venues in Philadelphia.
+      `You are a venue search planner for Philadelphia. Your job is to help find PHYSICAL VENUES AND PUBLIC BUILDINGS — NOT retail stores or businesses.
 
 User query: "${query}"
 
-Generate a search plan as JSON with these fields:
-1. "queries" — array of 3-5 different Google Maps text search queries (each max 6 words, must include "Philadelphia"). Cover different angles:
-   - Direct interpretation
-   - Related venue types
-   - Neighborhood-specific
-   - Broader category
+Think about what KIND of physical place the user actually wants to visit. Then generate:
 
-2. "placeTypes" — array of Google Places type strings relevant to the intent. Valid types include: bar, night_club, restaurant, cafe, museum, art_gallery, library, park, stadium, movie_theater, performing_arts_theater, book_store, bowling_alley, gym, amusement_park, tourist_attraction.
-   Pick 2-4 that best match.
+1. "queries" — 3-5 Google Maps search queries (max 7 words each, include "Philadelphia"). Each query must describe a PHYSICAL VENUE using spatial words like: arena, stadium, court, field, gym, center, complex, park, hall, theater, museum, library.
+   Example for "sports": ["sports arena Philadelphia", "athletic complex Philadelphia", "recreation center Philadelphia"]
+   Example for "basketball": ["basketball court Philadelphia", "basketball arena Philadelphia", "NBA arena Philadelphia"]
+   NEVER generate queries for retail stores or businesses.
 
-3. "seedTags" — array of 3-6 lowercase keywords to match against a local venue database tags. Think about what tags a relevant venue might have.
+2. "placeTypes" — 2-4 Google Places types for the BUILDING type.
+   Sports/athletics → stadium, gym, park
+   Music/concerts → performing_arts_theater, night_club
+   Theater/dance → performing_arts_theater
+   Art/culture → art_gallery, museum
+   Books/learning → library
+   Film → movie_theater
+   Outdoors → park, tourist_attraction
 
-Return ONLY valid JSON, no markdown fences.`,
-      "openai/gpt-4-turbo",
-      { temperature: 0.3, max_tokens: 400 }
+3. "excludeTypes" — 2-4 Google Places types that are clearly NOT what the user wants (e.g. clothing_store, shoe_store, restaurant, bar for sports queries).
+
+4. "seedTags" — 3-5 lowercase keywords describing the venue type.
+
+5. "venueIntent" — one sentence: what physical place does the user want?
+
+6. "taxonomy" — exactly ONE category from this fixed list:
+   Sports & Recreation | Music & Concerts | Arts & Culture | Theater & Performance |
+   Film & Cinema | Education & Lectures | Nightlife & Entertainment | Food & Markets |
+   Nature & Parks | Community & Social | Family & Kids | Other
+
+Return ONLY valid JSON, no markdown.`,
+      EXTRACT_MODEL,
+      { temperature: 0.2, max_tokens: 600 }
     );
     const plan = JSON.parse(content.replace(/```json|```/g, "").trim());
     res.json({
-      queries: Array.isArray(plan.queries) ? plan.queries.slice(0, 5) : fallback.queries,
-      placeTypes: Array.isArray(plan.placeTypes) ? plan.placeTypes.slice(0, 4) : [],
-      seedTags: Array.isArray(plan.seedTags) ? plan.seedTags.slice(0, 6) : fallback.seedTags,
+      queries:      Array.isArray(plan.queries)      ? plan.queries.slice(0, 5)      : fallback.queries,
+      placeTypes:   Array.isArray(plan.placeTypes)   ? plan.placeTypes.slice(0, 4)   : [],
+      excludeTypes: Array.isArray(plan.excludeTypes) ? plan.excludeTypes.slice(0, 6) : [],
+      seedTags:     Array.isArray(plan.seedTags)     ? plan.seedTags.slice(0, 6)     : fallback.seedTags,
+      venueIntent:  typeof plan.venueIntent === "string" ? plan.venueIntent : "",
+      taxonomy:     typeof plan.taxonomy === "string"    ? plan.taxonomy    : "Other",
     });
   } catch (err) {
     console.error("search-plan error:", err.message);
@@ -866,6 +925,95 @@ app.get("/api/test", async (req, res) => {
   res.json(results);
 });
 
+// ════════════════════════════════════════════════════════════════
+//  SEARCH CACHE ENDPOINTS
+// ════════════════════════════════════════════════════════════════
+
+// List all cached searches (for browsing history / taxonomy view)
+app.get("/api/cache", (req, res) => {
+  const cache = readCache();
+  const now = Date.now();
+  const entries = Object.values(cache).map(entry => ({
+    query: entry.normalizedQuery,
+    taxonomy: entry.taxonomy,
+    venueCount: entry.venues?.length || 0,
+    cachedAt: entry.cachedAt,
+    expiresAt: entry.expiresAt,
+    expired: new Date(entry.expiresAt).getTime() < now,
+  }));
+  // Sort by most recently cached
+  entries.sort((a, b) => new Date(b.cachedAt) - new Date(a.cachedAt));
+  res.json({ entries, total: entries.length });
+});
+
+// Check if a query is cached — returns venues if hit, { hit: false } if miss/expired
+app.post("/api/cache/lookup", (req, res) => {
+  const { query } = req.body;
+  if (!query) return res.json({ hit: false });
+
+  const key = normalizeQuery(query);
+  const cache = readCache();
+  const entry = cache[key];
+
+  if (!entry) return res.json({ hit: false });
+
+  const expired = new Date(entry.expiresAt).getTime() < Date.now();
+  if (expired) {
+    delete cache[key];
+    writeCache(cache);
+    L("Cache", `EXPIRED: "${key}"`);
+    return res.json({ hit: false, reason: "expired" });
+  }
+
+  L("Cache", `HIT: "${key}" — ${entry.venues?.length} venues [${entry.taxonomy}]`);
+  res.json({
+    hit: true,
+    taxonomy: entry.taxonomy,
+    venues: entry.venues,
+    cachedAt: entry.cachedAt,
+    expiresAt: entry.expiresAt,
+  });
+});
+
+// Save search results to cache
+app.post("/api/cache/save", (req, res) => {
+  const { query, venues, taxonomy } = req.body;
+  if (!query || !Array.isArray(venues)) {
+    return res.status(400).json({ error: "query and venues[] required" });
+  }
+
+  const key = normalizeQuery(query);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+  const cache = readCache();
+  cache[key] = {
+    normalizedQuery: key,
+    taxonomy: taxonomy || "Other",
+    cachedAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    venues,
+  };
+
+  writeCache(cache);
+  L("Cache", `SAVED: "${key}" — ${venues.length} venues [${taxonomy}]`);
+  res.json({ ok: true, expiresAt: expiresAt.toISOString() });
+});
+
+// Delete a specific cache entry
+app.delete("/api/cache/:query", (req, res) => {
+  const key = normalizeQuery(decodeURIComponent(req.params.query));
+  const cache = readCache();
+  if (cache[key]) {
+    delete cache[key];
+    writeCache(cache);
+    L("Cache", `DELETED: "${key}"`);
+    res.json({ ok: true });
+  } else {
+    res.json({ ok: false, reason: "not found" });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
@@ -883,10 +1031,14 @@ app.listen(PORT, () => {
   console.log(`
 🕷️  Event Scraper v4 — http://localhost:${PORT}
    ─────────────────────────────────────────────
-   POST /api/scrape-venue   Scrape one venue
-   POST /api/scrape-batch   Scrape multiple
-   GET  /api/test           🧪 Full diagnostic
-   GET  /api/health         Health check
+   POST /api/scrape-venue     Scrape one venue
+   POST /api/scrape-batch     Scrape multiple
+   GET  /api/cache            List cached searches
+   POST /api/cache/lookup     Check cache hit
+   POST /api/cache/save       Save search results
+   DELETE /api/cache/:query   Remove cache entry
+   GET  /api/test             🧪 Full diagnostic
+   GET  /api/health           Health check
 
    OpenRouter Key: ${OPENROUTER_KEY ? "✅ set" : "❌ MISSING"}
 

@@ -81,23 +81,23 @@ const makeId = () => `v_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 // ═══════════════════════════════════════════════════════════════
 
 async function generateSearchPlan(userQuery) {
-  const fallbackPlan = {
-    queries: [userQuery.toLowerCase().includes("philadelphia") ? userQuery : `${userQuery} Philadelphia`],
+  const fallback = {
+    queries: [`${userQuery} Philadelphia`, `${userQuery} venue Philadelphia`],
     placeTypes: [],
-    seedTags: userQuery.toLowerCase().split(/\s+/)
+    seedTags: userQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2),
+    venueIntent: `${userQuery} public venue`,
+    excludeTypes: ["clothing_store","shoe_store","liquor_store"],
   };
-
   try {
     const response = await fetch(`${BACKEND_URL}/api/search-plan`, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ query: userQuery })
     });
-    if (!response.ok) return fallbackPlan;
+    if (!response.ok) return fallback;
     return await response.json();
-  } catch (error) {
-    console.error("Search plan error:", error.message);
-    return fallbackPlan;
+  } catch {
+    return fallback;
   }
 }
 
@@ -249,6 +249,28 @@ async function searchVenues(query, placesService, archive, onProgress) {
   if (!query?.trim()) return { venues: [], error: "Empty query", source: "none" };
   const progress = onProgress || (() => {});
 
+  // ── Check search cache first ──
+  try {
+    const cacheRes = await fetch(`${BACKEND_URL}/api/cache/lookup`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query: query.trim() })
+    });
+    if (cacheRes.ok) {
+      const cached = await cacheRes.json();
+      if (cached.hit) {
+        progress(`Loaded from cache [${cached.taxonomy}]`);
+        return {
+          venues: cached.venues,
+          error: null,
+          source: "cache",
+          taxonomy: cached.taxonomy,
+          cachedAt: cached.cachedAt,
+        };
+      }
+    }
+  } catch { /* cache miss — continue with live search */ }
+
   progress("Generating search plan…");
   const plan = await generateSearchPlan(query);
 
@@ -279,8 +301,18 @@ async function searchVenues(query, placesService, archive, onProgress) {
   progress("Semantic filtering…");
   const filtered = await filterVenuesByIntent(query, deduped);
 
+  // ── Save to search cache (fire-and-forget) ──
+  if (filtered.length > 0) {
+    fetch(`${BACKEND_URL}/api/cache/save`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query: query.trim(), venues: filtered, taxonomy: plan.taxonomy || "Other" })
+    }).catch(() => {});
+  }
+
   return {
     venues: filtered, error: null, source: "multi",
+    taxonomy: plan.taxonomy || "Other",
     stats: { textResults: textResults.length, nearbyResults: nearbyResults.length, archiveResults: archiveResults.length, preFilter: deduped.length, postFilter: filtered.length }
   };
 }
@@ -456,6 +488,8 @@ export default function PhillyEventScraper() {
   const [searchError, setSearchError] = useState("");
   const [searchProgress, setSearchProgress] = useState("");
   const [searchStats, setSearchStats] = useState(null);
+  const [searchTaxonomy, setSearchTaxonomy] = useState(null);
+  const [searchSource, setSearchSource] = useState(null);
   const [mapInstance, setMapInstance] = useState(null);
 
   // Archive state
@@ -523,6 +557,7 @@ export default function PhillyEventScraper() {
   // Search
   const handleSearch = useCallback(async (query) => {
     setSearching(true); setSearchError(""); setSearchProgress(""); setSearchStats(null);
+    setSearchTaxonomy(null); setSearchSource(null);
     setFilterType("all");
     setFilterCat("all");
     setMinRating(0);
@@ -534,6 +569,8 @@ export default function PhillyEventScraper() {
       const result = await searchVenues(query, placesService, archive, setSearchProgress);
       setVenues(result.venues || []);
       setSearchStats(result.stats || null);
+      setSearchTaxonomy(result.taxonomy || null);
+      setSearchSource(result.source || null);
       if (result.error) setSearchError(result.error);
       setHasSearched(true);
     } catch (error) {
@@ -750,6 +787,22 @@ export default function PhillyEventScraper() {
             </div>
           ) : (
             <>
+              {/* Taxonomy + cache badge row */}
+              {(searchTaxonomy || searchSource === "cache") && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  {searchTaxonomy && (
+                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 2, background: "#EFF6FF", border: "1px solid #BFDBFE", color: "#1D4ED8", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                      {searchTaxonomy}
+                    </span>
+                  )}
+                  {searchSource === "cache" && (
+                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 2, background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#15803D", fontWeight: 600, letterSpacing: "0.06em" }}>
+                      CACHED · INSTANT
+                    </span>
+                  )}
+                </div>
+              )}
+
               {searchStats && (
                 <div className="stats-bar" style={{ marginBottom: 16 }}>
                   <span>PIPELINE:</span>
