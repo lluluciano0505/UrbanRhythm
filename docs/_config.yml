@@ -1,0 +1,12 @@
+title: UrbanRhythm
+description: Multi-agent cultural event discovery pipeline
+theme: jekyll-theme-cayman
+show_downloads: false
+
+nav:
+  - title: Design Decisions
+    url: /DESIGN
+  - title: Agents & Tools
+    url: /AGENTS_AND_TOOLS
+  - title: Technical Architecture
+    url: /TECHNICAL
