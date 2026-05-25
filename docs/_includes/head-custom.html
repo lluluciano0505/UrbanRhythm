@@ -1,0 +1,70 @@
+<!-- Google Translate one-click toggle -->
+<style>
+  .lang-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 9999;
+    background: #2563EB;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.45);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0.04em;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .lang-btn:hover  { background: #1D4ED8; transform: translateY(-1px); }
+  .lang-btn:active { transform: translateY(0); }
+
+  /* hide google's top bar */
+  .goog-te-banner-frame.skiptranslate { display: none !important; }
+  body { top: 0 !important; }
+  #gt-widget { display: none; }
+</style>
+
+<div id="gt-widget"></div>
+
+<script>
+  function googleTranslateElementInit() {
+    new google.translate.TranslateElement({
+      pageLanguage: 'en',
+      includedLanguages: 'zh-CN',
+      autoDisplay: false
+    }, 'gt-widget');
+  }
+</script>
+<script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.createElement('button');
+    btn.className = 'lang-btn';
+    btn.textContent = '中文';
+    document.body.appendChild(btn);
+
+    var translated = false;
+
+    btn.addEventListener('click', function () {
+      if (!translated) {
+        var sel = document.querySelector('.goog-te-combo');
+        if (sel) {
+          sel.value = 'zh-CN';
+          sel.dispatchEvent(new Event('change'));
+          btn.textContent = 'EN';
+          translated = true;
+        }
+      } else {
+        // clear translate cookie and reload to restore original
+        var host = window.location.hostname;
+        document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.' + host;
+        window.location.reload();
+      }
+    });
+  });
+</script>
