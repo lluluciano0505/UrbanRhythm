@@ -7,13 +7,13 @@ title: Technical Architecture
 ## Overview
 
 Urban Rhythm is a multi-agent AI system that automatically discovers cultural venues in any
-English-speaking city, visits their websites to find upcoming events, and presents them in a
-searchable web interface.
+US city, scrapes their websites for upcoming events, and presents curated results in a
+searchable 4-layer web dashboard.
 
-At its core, the system is a **supervisor-managed agent graph**. Instead of following a fixed
-sequence of steps written in code, an AI model decides at each stage what action to take next
-based on what it has found so far. This is the key architectural difference from a traditional
-pipeline.
+At its core, the system is a **LangGraph `StateGraph`** pipeline — a directed acyclic graph
+where each node is a specialized agent with a single responsibility. Parallel venue scraping
+is handled via the `Send` API fan-out, allowing N venues to be processed concurrently with
+results merged by a reducer.
 
 ---
 
@@ -45,17 +45,17 @@ which one works for each website, and skipping failed approaches in future runs.
 
 | Layer | Technology | Reason for choice |
 |---|---|---|
-| Frontend | React 18 + Vite (unchanged) | Existing UI reused as-is |
-| Backend | Python + FastAPI | Standard for AI agent systems; async support |
-| Agent Orchestration | LangGraph | Stateful graph engine for multi-step agents |
-| LLM Calls | LangChain + OpenRouter | Model-agnostic wrapper; allows switching models |
+| Frontend | React 18 + Vite | 4-layer dashboard, HMR for fast iteration |
+| Backend | Python + FastAPI | Async support, SSE streaming |
+| Agent Orchestration | LangGraph `StateGraph` + `Send` API | Stateful DAG with parallel fan-out |
+| LLM Gateway | OpenRouter | Single API key for GPT-4o-mini + Claude Sonnet |
 | City Geocoding | Nominatim (OpenStreetMap) | Free, global, no API key needed |
-| Venue Discovery | OSM Overpass API | Free, global, covers all major cities |
-| Web Page Fetching | Jina Reader API | Converts raw HTML into clean text for LLMs |
-| Web Search Fallback | Tavily API | Live search when direct scraping fails |
-| Database | SQLite (existing schema extended) | Simple, local, no server infrastructure |
-| Event Extraction LLM | GPT-4o-mini via OpenRouter | Fast and cheap for structured extraction |
-| Event Judging LLM | Claude Sonnet via OpenRouter | Better reasoning for quality assessment |
+| Venue Discovery | OSM Overpass API | Free, global, covers all major US cities |
+| Web Page Fetching | Jina Reader API | Converts raw HTML to clean markdown for LLMs |
+| Web Search Fallback | Tavily API | Structured search for venues without websites |
+| Database | SQLite (WAL mode) | Simple, local, no server infrastructure |
+| Event Extraction LLM | GPT-4o-mini via OpenRouter | High-volume, cost-efficient structured extraction |
+| Event Judging LLM | Claude 3.5 Sonnet via OpenRouter | Borderline cases only — cost-aware routing |
 
 ---
 
@@ -85,7 +85,7 @@ User (browser)
                │
                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    LangGraph Supervisor Graph                │
+│                    LangGraph StateGraph Pipeline             │
 │                                                             │
 │  ┌──────────────┐   ┌──────────────┐   ┌────────────────┐  │
 │  │ City         │   │ Venue        │   │ Venue          │  │
@@ -402,22 +402,10 @@ Based on 50 venues, average 4 LLM calls per venue:
 
 | LLM usage | Model | Est. calls | Est. cost |
 |---|---|---|---|
-| Event extraction | GPT-4o-mini | ~150 | ~$0.30 |
-| Event judging | Claude Sonnet | ~50 | ~$0.40 |
-| Web search fallback | Perplexity Sonar | ~20 | ~$0.10 |
-| **Total** | | | **~$0.80** |
+| Event extraction + strategy | GPT-4o-mini | ~150 | ~$0.30 |
+| Event judging (borderline only) | Claude 3.5 Sonnet | ~50 | ~$0.40 |
+| Web search fallback | Tavily | ~20 | ~$0.05 |
+| **Total** | | | **~$0.75** |
 
 Costs decrease on repeat runs of the same city as the Playbook fills in.
 
----
-
-## Migration from Existing System
-
-| Component | Action |
-|---|---|
-| React frontend | Keep — only change `VITE_BACKEND_URL` to point to FastAPI |
-| SQLite database | Keep and extend — add `playbook` table |
-| Existing PA venue data | Re-import via new Venue Discovery format |
-| Node.js / Express server | Replace entirely with FastAPI |
-| JS agent logic | Rewrite in Python using LangGraph |
-| OpenRouter API key | Keep — same key works in Python |
