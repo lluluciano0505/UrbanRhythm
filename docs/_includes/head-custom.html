@@ -1,3 +1,65 @@
+<!-- Mobile hamburger nav -->
+<style>
+  .ham-btn {
+    display: none;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 5px;
+    cursor: pointer;
+    padding: 8px 10px;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+  }
+  .ham-btn span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: #fff;
+    margin: 4px 0;
+    border-radius: 1px;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  .ham-btn.open span:nth-child(1) { transform: rotate(45deg) translate(4px, 4px); }
+  .ham-btn.open span:nth-child(2) { opacity: 0; }
+  .ham-btn.open span:nth-child(3) { transform: rotate(-45deg) translate(4px, -4px); }
+
+  .nav-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+  @media (max-width: 640px) {
+    .page-header { position: relative !important; }
+    .ham-btn { display: block; }
+    .nav-links { display: none; flex-direction: column; width: 100%; margin-top: 8px; }
+    .nav-links.open { display: flex; }
+    .nav-links .btn { width: 100%; box-sizing: border-box; text-align: center; margin: 0; }
+  }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var header = document.querySelector('.page-header');
+  if (!header) return;
+  var btns = Array.from(header.querySelectorAll('a.btn'));
+  if (!btns.length) return;
+
+  var navDiv = document.createElement('div');
+  navDiv.className = 'nav-links';
+  header.insertBefore(navDiv, btns[0]);
+  btns.forEach(function (b) { navDiv.appendChild(b); });
+
+  var ham = document.createElement('button');
+  ham.className = 'ham-btn';
+  ham.setAttribute('aria-label', 'Toggle navigation');
+  ham.innerHTML = '<span></span><span></span><span></span>';
+  header.appendChild(ham);
+
+  ham.addEventListener('click', function () {
+    ham.classList.toggle('open');
+    navDiv.classList.toggle('open');
+  });
+});
+</script>
+
 <!-- Google Translate one-click toggle -->
 <style>
   .lang-btn {
