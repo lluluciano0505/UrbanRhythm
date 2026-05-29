@@ -22,6 +22,114 @@ async function api(path) {
   } catch { return null; }
 }
 
+// ─── US States & Cities ──────────────────────────────────────────────────────
+
+const US_CITIES = {
+  "Alabama":        ["Birmingham", "Huntsville", "Mobile", "Montgomery"],
+  "Alaska":         ["Anchorage", "Fairbanks", "Juneau"],
+  "Arizona":        ["Flagstaff", "Mesa", "Phoenix", "Scottsdale", "Tempe", "Tucson"],
+  "Arkansas":       ["Fayetteville", "Fort Smith", "Little Rock"],
+  "California":     ["Berkeley", "Fresno", "Long Beach", "Los Angeles", "Oakland", "Sacramento", "San Diego", "San Francisco", "San Jose", "Santa Barbara", "Santa Cruz"],
+  "Colorado":       ["Aurora", "Boulder", "Colorado Springs", "Denver", "Fort Collins"],
+  "Connecticut":    ["Bridgeport", "Hartford", "New Haven", "Stamford"],
+  "Delaware":       ["Dover", "Newark", "Wilmington"],
+  "Florida":        ["Fort Lauderdale", "Jacksonville", "Miami", "Orlando", "St. Petersburg", "Tallahassee", "Tampa"],
+  "Georgia":        ["Athens", "Atlanta", "Augusta", "Savannah"],
+  "Hawaii":         ["Hilo", "Honolulu", "Kailua"],
+  "Idaho":          ["Boise", "Idaho Falls", "Nampa"],
+  "Illinois":       ["Aurora", "Chicago", "Evanston", "Naperville", "Rockford", "Springfield"],
+  "Indiana":        ["Fort Wayne", "Indianapolis", "South Bend"],
+  "Iowa":           ["Cedar Rapids", "Des Moines", "Iowa City"],
+  "Kansas":         ["Kansas City", "Lawrence", "Topeka", "Wichita"],
+  "Kentucky":       ["Bowling Green", "Lexington", "Louisville"],
+  "Louisiana":      ["Baton Rouge", "Lafayette", "New Orleans", "Shreveport"],
+  "Maine":          ["Augusta", "Bangor", "Portland"],
+  "Maryland":       ["Annapolis", "Baltimore", "Frederick", "Rockville"],
+  "Massachusetts":  ["Boston", "Cambridge", "Lowell", "New Bedford", "Springfield", "Worcester"],
+  "Michigan":       ["Ann Arbor", "Detroit", "Flint", "Grand Rapids", "Lansing"],
+  "Minnesota":      ["Duluth", "Minneapolis", "Rochester", "Saint Paul"],
+  "Mississippi":    ["Biloxi", "Jackson", "Oxford"],
+  "Missouri":       ["Columbia", "Kansas City", "Saint Louis", "Springfield"],
+  "Montana":        ["Billings", "Bozeman", "Great Falls", "Missoula"],
+  "Nebraska":       ["Lincoln", "Omaha"],
+  "Nevada":         ["Henderson", "Las Vegas", "Reno"],
+  "New Hampshire":  ["Concord", "Manchester", "Portsmouth"],
+  "New Jersey":     ["Atlantic City", "Jersey City", "Newark", "Trenton"],
+  "New Mexico":     ["Albuquerque", "Santa Fe", "Taos"],
+  "New York":       ["Albany", "Brooklyn", "Buffalo", "Manhattan", "Queens", "Rochester", "Syracuse"],
+  "North Carolina": ["Asheville", "Chapel Hill", "Charlotte", "Durham", "Greensboro", "Raleigh", "Winston-Salem"],
+  "North Dakota":   ["Bismarck", "Fargo", "Grand Forks"],
+  "Ohio":           ["Akron", "Cincinnati", "Cleveland", "Columbus", "Dayton", "Toledo"],
+  "Oklahoma":       ["Norman", "Oklahoma City", "Tulsa"],
+  "Oregon":         ["Eugene", "Portland", "Salem"],
+  "Pennsylvania":   ["Allentown", "Philadelphia", "Pittsburgh", "Reading"],
+  "Rhode Island":   ["Newport", "Providence", "Warwick"],
+  "South Carolina": ["Charleston", "Columbia", "Greenville"],
+  "South Dakota":   ["Rapid City", "Sioux Falls"],
+  "Tennessee":      ["Chattanooga", "Knoxville", "Memphis", "Nashville"],
+  "Texas":          ["Austin", "Dallas", "El Paso", "Fort Worth", "Houston", "Lubbock", "San Antonio"],
+  "Utah":           ["Ogden", "Provo", "Salt Lake City"],
+  "Vermont":        ["Burlington", "Montpelier"],
+  "Virginia":       ["Alexandria", "Arlington", "Norfolk", "Richmond", "Roanoke", "Virginia Beach"],
+  "Washington":     ["Bellevue", "Olympia", "Seattle", "Spokane", "Tacoma"],
+  "West Virginia":  ["Charleston", "Huntington", "Morgantown"],
+  "Wisconsin":      ["Green Bay", "Madison", "Milwaukee"],
+  "Wyoming":        ["Casper", "Cheyenne", "Laramie"],
+};
+
+function CityPicker({ value, onChange }) {
+  const initState = () => {
+    if (!value) return "";
+    for (const [st, cities] of Object.entries(US_CITIES)) {
+      if (cities.some(c => value.startsWith(c))) return st;
+    }
+    return "";
+  };
+  const [selState, setSelState] = useState(initState);
+  const cities = selState ? US_CITIES[selState] || [] : [];
+
+  const handleState = (st) => {
+    setSelState(st);
+    onChange("");
+  };
+  const handleCity = (city) => {
+    if (city) onChange(`${city}, ${selState}`);
+  };
+  const currentCity = cities.find(c => value && value.startsWith(c)) || "";
+
+  return (
+    <div style={{ display: "flex", gap: 10, flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1 }}>
+        <div style={S.label}>STATE</div>
+        <select
+          value={selState}
+          onChange={e => handleState(e.target.value)}
+          style={{ ...S.input, width: "100%", boxSizing: "border-box", cursor: "pointer" }}
+        >
+          <option value="">— select state —</option>
+          {Object.keys(US_CITIES).map(st => (
+            <option key={st} value={st}>{st}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={S.label}>CITY</div>
+        <select
+          value={currentCity}
+          onChange={e => handleCity(e.target.value)}
+          disabled={!selState}
+          style={{ ...S.input, width: "100%", boxSizing: "border-box", cursor: selState ? "pointer" : "not-allowed", opacity: selState ? 1 : 0.5 }}
+        >
+          <option value="">— select city —</option>
+          {cities.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
 const S = {
@@ -109,17 +217,8 @@ function VenuesLayer({ city, setCity, goNext }) {
         <div style={S.section}>VENUE BROWSER</div>
       </div>
 
-      <div style={{ ...S.card, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 24, alignItems: "start" }}>
-        <div>
-          <div style={S.label}>CITY</div>
-          <input
-            value={cityInput}
-            onChange={e => setCityInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && query()}
-            placeholder="Austin, Boston, Seattle…"
-            style={{ ...S.input, width: "100%", boxSizing: "border-box" }}
-          />
-        </div>
+      <div style={{ ...S.card, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 24, alignItems: "start" }}>
+        <CityPicker value={cityInput} onChange={setCityInput} />
 
         <div>
           <div style={S.label}>TYPE</div>
@@ -191,16 +290,22 @@ function VenuesLayer({ city, setCity, goNext }) {
 
 // ─── L2: Scheduler ────────────────────────────────────────────────────────────
 
-function SchedulerLayer({ city: initCity, setCity, goNext, onRunComplete }) {
-  const [cityInput, setCityInput] = useState(initCity || "");
-  const [radiusKm,  setRadiusKm]  = useState(30);
-  const [running,   setRunning]   = useState(false);
-  const [log,       setLog]       = useState([]);
-  const [done,      setDone]      = useState(false);
-  const [runId,     setRunId]     = useState(null);
-  const [progress,  setProgress]  = useState({ done: 0, total: 0, events: 0, current: "" });
-  const [traces,    setTraces]    = useState({});
-  const [runStats,  setRunStats]  = useState(null);
+function SchedulerLayer({ city: initCity, setCity, goNext, onRunStart, onRunComplete }) {
+  const [cityInput,    setCityInput]    = useState(initCity || "");
+  const [radiusKm,     setRadiusKm]     = useState(30);
+  const [running,      setRunning]      = useState(false);
+  const [log,          setLog]          = useState([]);
+  const [done,         setDone]         = useState(false);
+  const [runId,        setRunId]        = useState(null);
+  const [progress,     setProgress]     = useState({ done: 0, total: 0, events: 0, current: "" });
+  const [traces,       setTraces]       = useState({});
+  const [runStats,     setRunStats]     = useState(null);
+  const [venueTypes,   setVenueTypes]   = useState([]);   // [] = all types
+  const [venueList,    setVenueList]    = useState([]);
+  const [selectedIds,  setSelectedIds]  = useState(null); // null = all
+  const [venueLoading, setVenueLoading] = useState(false);
+
+  const toggleType = (t) => setVenueTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   const logRef = useRef(null);
   const esRef  = useRef(null);
 
@@ -208,17 +313,49 @@ function SchedulerLayer({ city: initCity, setCity, goNext, onRunComplete }) {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [log]);
 
+  // Load venues from DB whenever city or type filter changes
+  useEffect(() => {
+    if (!cityInput.trim()) { setVenueList([]); setSelectedIds(null); return; }
+    setVenueLoading(true);
+    const p = new URLSearchParams({ city: cityInput.trim(), limit: "500" });
+    venueTypes.forEach(t => p.append("type", t));
+    api(`/api/venues?${p}`)
+      .then(d => {
+        const vs = d?.venues || [];
+        setVenueList(vs);
+        setSelectedIds(null);
+      })
+      .finally(() => setVenueLoading(false));
+  }, [cityInput, venueTypes]);
+
+  const allIds    = venueList.map(v => v.id);
+  const selSet    = selectedIds ? new Set(selectedIds) : new Set(allIds);
+  const allSel    = selectedIds === null || selectedIds.length === allIds.length;
+  const noneSel   = selectedIds !== null && selectedIds.length === 0;
+
+  const toggleVenue = (id) => {
+    const cur = selectedIds ?? allIds;
+    const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+    setSelectedIds(next.length === allIds.length ? null : next);
+  };
+  const selectAll  = () => setSelectedIds(null);
+  const selectNone = () => setSelectedIds([]);
+
   const run = async () => {
     if (running || !cityInput.trim()) return;
     setRunning(true); setLog([]); setDone(false); setTraces({}); setRunStats(null);
     setProgress({ done: 0, total: 0, events: 0, current: "starting…" });
+
+    const body = { city: cityInput.trim(), radius_km: radiusKm };
+    if (venueTypes.length) body.amenity_types = venueTypes;
+    if (selectedIds !== null) body.venue_ids = selectedIds;
 
     let rid;
     try {
       const res = await fetch(`${BACKEND}/api/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city: cityInput.trim(), radius_km: radiusKm }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -228,7 +365,9 @@ function SchedulerLayer({ city: initCity, setCity, goNext, onRunComplete }) {
       const data = await res.json();
       rid = data.run_id;
       setRunId(rid);
-      setCity(cityInput.trim());
+      const cityName = cityInput.trim().split(",")[0].trim();
+      setCity(cityName);
+      onRunStart?.(rid, cityName);
     } catch {
       setLog([{ phase: "run_error", error: "Could not connect to backend" }]);
       setRunning(false); return;
@@ -266,12 +405,12 @@ function SchedulerLayer({ city: initCity, setCity, goNext, onRunComplete }) {
         if (msg.phase === "run_done") {
           setRunStats(msg);
           setRunning(false); setDone(true);
-          onRunComplete?.(); es.close(); return;
+          onRunComplete?.(rid, cityInput.trim().split(",")[0].trim()); es.close(); return;
         }
         if (msg.phase === "run_error") {
           setLog(prev => [...prev, msg]);
           setRunning(false); setDone(true);
-          onRunComplete?.(); es.close(); return;
+          onRunComplete?.(rid, cityInput.trim().split(",")[0].trim()); es.close(); return;
         }
         setLog(prev => [...prev, msg]);
       } catch {}
@@ -296,15 +435,19 @@ function SchedulerLayer({ city: initCity, setCity, goNext, onRunComplete }) {
       <div style={{ ...S.card, padding: 20, marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", marginBottom: 14 }}>RUN A CITY</div>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={S.label}>CITY</div>
-            <input
-              value={cityInput}
-              onChange={e => setCityInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && run()}
-              placeholder="Austin, Boston, Seattle…"
-              style={{ ...S.input, width: "100%", boxSizing: "border-box" }}
-            />
+          <CityPicker value={cityInput} onChange={setCityInput} />
+          <div>
+            <div style={S.label}>TYPE</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {Object.entries(TYPE_META).map(([k, { label, color }]) => {
+                const on = venueTypes.includes(k);
+                return (
+                  <button key={k} onClick={() => toggleType(k)} style={{ padding: "6px 12px", fontSize: 11, borderRadius: 3, cursor: "pointer", border: `1px solid ${on ? color : "#E2E8F0"}`, background: on ? color + "18" : "#F8FAFC", color: on ? color : "#64748B", fontFamily: "inherit" }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div>
             <div style={S.label}>RADIUS</div>
@@ -321,6 +464,41 @@ function SchedulerLayer({ city: initCity, setCity, goNext, onRunComplete }) {
           </div>
         </div>
       </div>
+
+      {cityInput.trim() && (
+        <div style={{ ...S.card, marginBottom: 20, overflow: "hidden" }}>
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.1em", fontWeight: 600 }}>
+              VENUES {venueLoading ? "…" : venueList.length > 0 ? `· ${venueList.length} FOUND` : "· NONE IN DB — WILL DISCOVER ON RUN"}
+            </span>
+            {venueList.length > 0 && !venueLoading && (
+              <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                <span style={{ fontSize: 10, color: "#64748B" }}>
+                  {selectedIds === null ? allIds.length : selectedIds.length} / {allIds.length} selected
+                </span>
+                <button onClick={selectAll}  style={{ ...S.btn(allSel),  fontSize: 10, padding: "3px 10px" }}>ALL</button>
+                <button onClick={selectNone} style={{ ...S.btn(noneSel), fontSize: 10, padding: "3px 10px" }}>NONE</button>
+              </div>
+            )}
+          </div>
+          {venueList.length > 0 && !venueLoading && (
+            <div style={{ maxHeight: 260, overflowY: "auto" }}>
+              {venueList.map(v => {
+                const checked = selSet.has(v.id);
+                return (
+                  <div key={v.id} onClick={() => toggleVenue(v.id)}
+                    style={{ padding: "9px 16px", borderBottom: "1px solid #F8FAFC", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", background: checked ? "#F8FAFC" : "#FFF", opacity: checked ? 1 : 0.45 }}>
+                    <input type="checkbox" checked={checked} readOnly style={{ accentColor: "#2563EB", cursor: "pointer" }} />
+                    <TypeBadge type={v.type} small />
+                    <span style={{ fontSize: 12, color: "#1E293B", flex: 1 }}>{v.name}</span>
+                    {v.website && <span style={{ fontSize: 10, color: "#94A3B8" }}>↗</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {traceEntries.length > 0 && (
         <div style={{ ...S.card, marginBottom: 12, overflow: "hidden" }}>
@@ -846,42 +1024,211 @@ function KnowledgeLayer({ city }) {
   );
 }
 
+// ─── Run History Sidebar ─────────────────────────────────────────────────────
+
+function fmt(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const now = new Date();
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
+const normCity = (c) => c ? c.split(",")[0].trim() : c;
+
+function RunHistorySidebar({ activeCity, onSelect, runVersion }) {
+  const [runs, setRuns] = useState([]);
+
+  useEffect(() => {
+    api("/api/runs").then(d => {
+      const raw = d?.runs || [];
+      // deduplicate by normalized city name — keep most recent run per city
+      const seen = new Map();
+      for (const r of raw) {
+        const key = normCity(r.city).toLowerCase();
+        if (!seen.has(key)) seen.set(key, { ...r, city: normCity(r.city) });
+      }
+      setRuns([...seen.values()]);
+    });
+  }, [runVersion]);
+
+  return (
+    <div style={{
+      width: 190, flexShrink: 0, background: "#FFF",
+      borderRight: "1px solid #E2E8F0", display: "flex", flexDirection: "column",
+      minHeight: "calc(100vh - 73px)", position: "sticky", top: 73, alignSelf: "flex-start",
+      maxHeight: "calc(100vh - 73px)", overflowY: "auto",
+    }}>
+      <div style={{ padding: "12px 14px 8px", fontSize: 9, color: "#94A3B8", letterSpacing: "0.12em", fontWeight: 600, borderBottom: "1px solid #F1F5F9" }}>
+        RUN HISTORY
+      </div>
+      {runs.length === 0 && (
+        <div style={{ padding: "20px 14px", fontSize: 10, color: "#CBD5E1", lineHeight: 1.5 }}>
+          No finished runs yet.
+        </div>
+      )}
+      {runs.map(run => {
+        const active = normCity(run.city).toLowerCase() === normCity(activeCity || "").toLowerCase();
+        return (
+          <div key={run.run_id} onClick={() => onSelect(normCity(run.city))}
+            style={{
+              padding: "10px 14px", cursor: "pointer",
+              borderLeft: `3px solid ${active ? "#2563EB" : "transparent"}`,
+              background: active ? "#EFF6FF" : "transparent",
+              borderBottom: "1px solid #F8FAFC",
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F8FAFC"; }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: active ? "#2563EB" : "#1E293B", marginBottom: 3 }}>
+              {normCity(run.city)}
+            </div>
+            <div style={{ fontSize: 10, color: "#94A3B8" }}>
+              {run.events_accepted} events
+            </div>
+            <div style={{ fontSize: 9, color: "#CBD5E1", marginTop: 2 }}>
+              {fmt(run.finished_at)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── App shell ────────────────────────────────────────────────────────────────
 
 const LAYERS = [
-  { label: "L1", name: "Venues" },
-  { label: "L2", name: "Scheduler" },
-  { label: "L3", name: "Events" },
-  { label: "L4", name: "Knowledge" },
+  { label: "L1", name: "Scheduler" },
+  { label: "L2", name: "Events" },
+  { label: "L3", name: "Knowledge" },
 ];
 
+const ACTIVE_RUN_KEY = "ur_active_run";
+const LAST_CITY_KEY  = "ur_last_city";
+
 export default function App() {
-  const [layer,      setLayer]      = useState(1);
-  const [city,       setCity]       = useState("");
-  const [runVersion, setRunVersion] = useState(0);
+  const [layer,        setLayer]        = useState(() => parseInt(localStorage.getItem("ur_layer") || "0"));
+  const [city,         setCity]         = useState(() => localStorage.getItem(LAST_CITY_KEY) || "");
+  const [runVersion,   setRunVersion]   = useState(0);
+  const [recovering,   setRecovering]   = useState(false);
+  const [sidebarOpen,  setSidebarOpen]  = useState(true);
+  const pollRef = useRef(null);
+
+  const setAndSaveCity = (c) => { setCity(c); if (c) localStorage.setItem(LAST_CITY_KEY, c); };
+  const goLayer = (i) => { setLayer(i); localStorage.setItem("ur_layer", i); };
+
+  // On mount: if no saved city, fetch from latest finished run
+  useEffect(() => {
+    if (localStorage.getItem(LAST_CITY_KEY)) return;
+    api("/api/runs/latest").then(d => {
+      const c = d?.run?.city;
+      if (c) setAndSaveCity(c.split(",")[0].trim());
+    });
+  }, []);
+
+  // On mount: check localStorage for an interrupted run
+  useEffect(() => {
+    const saved = localStorage.getItem(ACTIVE_RUN_KEY);
+    if (!saved) return;
+    let parsed;
+    try { parsed = JSON.parse(saved); } catch { localStorage.removeItem(ACTIVE_RUN_KEY); return; }
+    const { run_id, city: savedCity } = parsed;
+    if (!run_id || !savedCity) { localStorage.removeItem(ACTIVE_RUN_KEY); return; }
+
+    setAndSaveCity(savedCity);
+    setRecovering(true);
+
+    const clear = () => { localStorage.removeItem(ACTIVE_RUN_KEY); setRecovering(false); };
+
+    // First check status — if already done, clear immediately (no SSE needed)
+    fetch(`${BACKEND}/api/run/${run_id}/status`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || data.finished || !data.still_running) {
+          if (data?.finished) { setRunVersion(v => v + 1); goLayer(1); }
+          clear();
+          return;
+        }
+        // Still running — reconnect SSE to watch for completion
+        const es = new EventSource(`${BACKEND}/api/run/${run_id}/stream`);
+        pollRef.current = es;
+        es.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.phase === "run_done" || msg.phase === "run_error") {
+              es.close(); clear(); setRunVersion(v => v + 1); goLayer(1);
+            }
+          } catch {}
+        };
+        es.onerror = () => { es.close(); clear(); };
+      })
+      .catch(clear);
+
+    return () => { pollRef.current?.close?.(); };
+  }, []);
+
+  const handleRunComplete = (runId, runCity) => {
+    localStorage.removeItem(ACTIVE_RUN_KEY);
+    setAndSaveCity(runCity);
+    setRunVersion(v => v + 1);
+  };
+
+  const handleRunStart = (runId, runCity) => {
+    setAndSaveCity(runCity);
+    localStorage.setItem(ACTIVE_RUN_KEY, JSON.stringify({ run_id: runId, city: runCity }));
+  };
+
+  const handleSelectCity = (runCity) => {
+    setAndSaveCity(normCity(runCity));
+    setRunVersion(v => v + 1);
+    goLayer(1);
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'DM Mono', 'SF Mono', monospace" }}>
-      <div style={{ background: "#FFF", borderBottom: "1px solid #E2E8F0", padding: "16px 28px", display: "flex", alignItems: "center", gap: 24, position: "sticky", top: 0, zIndex: 50 }}>
+      <div style={{ background: "#FFF", borderBottom: "1px solid #E2E8F0", padding: "16px 28px", display: "flex", alignItems: "center", gap: 16, position: "sticky", top: 0, zIndex: 50 }}>
+        <button
+          onClick={() => setSidebarOpen(o => !o)}
+          title={sidebarOpen ? "Hide history" : "Show history"}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", display: "flex", flexDirection: "column", gap: 4, borderRadius: 3, color: "#64748B" }}
+        >
+          <span style={{ display: "block", width: 18, height: 2, background: "currentColor", borderRadius: 1, transition: "transform 0.2s, opacity 0.2s", transform: sidebarOpen ? "rotate(45deg) translate(3px, 3px)" : "none" }} />
+          <span style={{ display: "block", width: 18, height: 2, background: "currentColor", borderRadius: 1, transition: "opacity 0.2s", opacity: sidebarOpen ? 0 : 1 }} />
+          <span style={{ display: "block", width: 18, height: 2, background: "currentColor", borderRadius: 1, transition: "transform 0.2s, opacity 0.2s", transform: sidebarOpen ? "rotate(-45deg) translate(3px, -3px)" : "none" }} />
+        </button>
         <div>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>
             URBAN <span style={{ color: "#2563EB" }}>RHYTHM</span>
           </div>
           <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 1, letterSpacing: "0.12em" }}>MULTI-AGENT · GLOBAL · SELF-LEARNING</div>
         </div>
+        {recovering && (
+          <div style={{ fontSize: 11, color: "#2563EB", display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ animation: "pulse 1s infinite" }}>●</span>
+            Run in progress — reconnecting…
+          </div>
+        )}
         <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
           {LAYERS.map(({ label, name }, i) => (
-            <button key={i} onClick={() => setLayer(i)} style={{ ...S.btn(layer === i), padding: "7px 16px" }}>
+            <button key={i} onClick={() => goLayer(i)} style={{ ...S.btn(layer === i), padding: "7px 16px" }}>
               <span style={{ opacity: 0.5, marginRight: 6 }}>{label}</span>{name}
             </button>
           ))}
         </div>
       </div>
 
-      {layer === 0 && <VenuesLayer city={city} setCity={setCity} goNext={() => setLayer(1)} />}
-      {layer === 1 && <SchedulerLayer city={city} setCity={setCity} goNext={() => setLayer(2)} onRunComplete={() => setRunVersion(v => v + 1)} />}
-      {layer === 2 && <EventsLayer city={city} goNext={() => setLayer(3)} runVersion={runVersion} />}
-      {layer === 3 && <KnowledgeLayer city={city} />}
+      <div style={{ display: "flex", alignItems: "flex-start" }}>
+        <div style={{ width: sidebarOpen ? 190 : 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s ease" }}>
+          <RunHistorySidebar activeCity={city} onSelect={handleSelectCity} runVersion={runVersion} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {layer === 0 && <SchedulerLayer city={city} setCity={setAndSaveCity} goNext={() => goLayer(1)} onRunStart={handleRunStart} onRunComplete={handleRunComplete} />}
+          {layer === 1 && <EventsLayer city={city} goNext={() => goLayer(2)} runVersion={runVersion} />}
+          {layer === 2 && <KnowledgeLayer city={city} />}
+        </div>
+      </div>
     </div>
   );
 }

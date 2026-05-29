@@ -1,0 +1,8 @@
+{
+  "dependencies": ["./backend"],
+  "graphs": {
+    "urban_rhythm": "./backend/agents/orchestrator.py:graph"
+  },
+  "env": ".env",
+  "python_version": "3.11"
+}

@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(.venv/bin/python3 -c ' *)",
+      "Bash(timeout 5 .venv/bin/uvicorn main:app --port 8000)",
+      "Bash(open http://localhost:5173)",
+      "Bash(awk '{print $2, $11, $12, $13, $14}')",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -I{} lsof -p {})",
+      "Bash(awk '{print $2, $11, $12, $13}')",
+      "Bash(pkill -f \"vite\\\\|next dev\\\\|uvicorn\\\\|npm run dev\")",
+      "Bash(kill -9 31677 36422 40822 55518 64516 64495 64511)",
+      "Bash(.venv/bin/uvicorn main:app --port 8000)",
+      "Bash(echo \"Backend PID: $!\")",
+      "Bash(echo \"Frontend PID: $!\")",
+      "Bash(npm run dev > /tmp/frontend.log 2>&1 & *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/api/pipeline/diagram)",
+      "Bash(.venv/bin/python3 -m pip install -U \"langgraph-cli[inmem]\")",
+      "Bash(python3 -m pip install -U \"langgraph-cli[inmem]\" --target .venv/lib/python3.13/site-packages)",
+      "Bash(.venv/bin/python3 --version)",
+      "Bash(curl https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py)",
+      "Bash(.venv/bin/python3 /tmp/get-pip.py --quiet)",
+      "Bash(.venv/bin/python3 -c \"import langgraph_cli; print\\('langgraph_cli OK'\\)\")",
+      "Bash(.venv/bin/python3 .venv/lib/python3.13/site-packages/bin/langgraph --version)",
+      "Bash(backend/.venv/bin/python3 backend/.venv/lib/python3.13/site-packages/bin/langgraph --version)",
+      "Bash(backend/.venv/bin/python3 backend/.venv/lib/python3.13/site-packages/bin/langgraph dev --no-browser)",
+      "Bash(curl -s http://localhost:2024/ok)",
+      "Bash(jobs -l)",
+      "Bash(pkill -f \"langgraph dev\")",
+      "Bash(backend/.venv/bin/python3 backend/.venv/lib/python3.13/site-packages/bin/langgraph dev --tunnel)",
+      "Bash(backend/.venv/bin/python3 -c ' *)",
+      "Bash(curl -s http://localhost:2024/threads -X GET)",
+      "Bash(curl -s \"http://localhost:2024/threads?limit=5\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s -X POST \"http://localhost:2024/threads/search\" -H \"Content-Type: application/json\" -d '{\"limit\": 3}')",
+      "Bash(curl -s -X POST \"http://localhost:2024/threads/search\" -H \"Content-Type: application/json\" -d '{\"limit\": 5}')",
+      "Bash(curl -s -X GET http://localhost:2024/threads/__TRACKED_VAR__/runs)",
+      "Bash(curl -s \"http://localhost:2024/threads/019e573a-7c0d-7072-8da3-3b2b7f99d066/state\")",
+      "Bash(sqlite3 /Users/luchieeoo/Documents/GitHub/UrbanRhythm/data/urbanrhythm.sqlite \"SELECT COUNT\\(*\\) as total, city, verdict FROM events GROUP BY city, verdict LIMIT 20;\")",
+      "Bash(sqlite3 /Users/luchieeoo/Documents/GitHub/UrbanRhythm/data/urbanrhythm.sqlite \"SELECT verdict, city, title, date FROM events WHERE city='Newark' LIMIT 5;\")",
+      "Bash(curl -s \"http://localhost:8000/api/events?city=Newark&verdict=accept&limit=5\")",
+      "Bash(python3 -c \"print\\('x' in None\\)\")"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}
