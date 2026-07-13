@@ -5,7 +5,11 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-_VALID_AMENITY_TYPES = {"library", "museum", "gallery", "arts_centre", "theatre", "cinema"}
+_VALID_AMENITY_TYPES = {
+    "library", "museum", "gallery", "arts_centre", "theatre", "cinema",
+    "nightclub", "bar", "community_centre", "concert_hall", "stadium",
+    "university", "zoo", "aquarium",
+}
 
 
 class RunRequest(BaseModel):

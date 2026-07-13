@@ -64,22 +64,23 @@ _CLOUDFLARE_MARKERS = (
 @tool
 def fetch_page(url: str) -> str:
     """Download a URL via Jina Reader API and return clean markdown text. Returns empty string on failure or Cloudflare block."""
+    import time
     jina_url = _JINA_URL + url
     headers = {"Authorization": f"Bearer {config.JINA_API_KEY}"} if config.JINA_API_KEY else {}
-    try:
-        resp = httpx.get(
-            jina_url,
-            headers=headers,
-            timeout=_JINA_TIMEOUT,
-        )
-        resp.raise_for_status()
-        text = resp.text
-        text_lower = text.lower()
-        if any(marker in text_lower for marker in _CLOUDFLARE_MARKERS):
+    for attempt in range(3):
+        try:
+            resp = httpx.get(jina_url, headers=headers, timeout=_JINA_TIMEOUT)
+            if resp.status_code == 429:
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s
+                continue
+            resp.raise_for_status()
+            text = resp.text
+            if any(marker in text.lower() for marker in _CLOUDFLARE_MARKERS):
+                return ""
+            return text
+        except httpx.HTTPError:
             return ""
-        return text
-    except httpx.HTTPError:
-        return ""
+    return ""
 
 
 # ── find_ical_feed ────────────────────────────────────────────────────────────

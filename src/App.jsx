@@ -5,10 +5,20 @@ import { useState, useEffect, useRef } from "react";
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 const TYPE_META = {
-  library:     { label: "Library",     color: "#3B82F6" },
-  museum:      { label: "Museum",      color: "#F59E0B" },
-  gallery:     { label: "Gallery",     color: "#8B5CF6" },
-  arts_centre: { label: "Arts Centre", color: "#10B981" },
+  library:          { label: "Library",          color: "#3B82F6" },
+  museum:           { label: "Museum",           color: "#F59E0B" },
+  gallery:          { label: "Gallery",          color: "#8B5CF6" },
+  arts_centre:      { label: "Arts Centre",      color: "#10B981" },
+  theatre:          { label: "Theatre",          color: "#EF4444" },
+  cinema:           { label: "Cinema",           color: "#F97316" },
+  nightclub:        { label: "Nightclub",        color: "#7C3AED" },
+  bar:              { label: "Bar",              color: "#D97706" },
+  community_centre: { label: "Community Centre", color: "#0D9488" },
+  concert_hall:     { label: "Concert Hall",     color: "#EC4899" },
+  stadium:          { label: "Stadium",          color: "#16A34A" },
+  university:       { label: "University",       color: "#4F46E5" },
+  zoo:              { label: "Zoo",              color: "#059669" },
+  aquarium:         { label: "Aquarium",         color: "#0284C7" },
 };
 
 const tc = (t) => TYPE_META[t]?.color || "#64748B";

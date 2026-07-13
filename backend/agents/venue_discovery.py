@@ -30,12 +30,20 @@ _CACHE_TTL_DAYS = 7
 # both are queried when "gallery" is requested so that elements tagged with both
 # are captured.
 _TYPE_QUERY_TAGS: dict[str, tuple[str, str]] = {
-    "library":      ("amenity",  "library"),
-    "museum":       ("tourism",  "museum"),
-    "gallery":      ("tourism",  "gallery"),
-    "arts_centre":  ("amenity",  "arts_centre"),
-    "theatre":      ("amenity",  "theatre"),
-    "cinema":       ("amenity",  "cinema"),
+    "library":          ("amenity",  "library"),
+    "museum":           ("tourism",  "museum"),
+    "gallery":          ("tourism",  "gallery"),
+    "arts_centre":      ("amenity",  "arts_centre"),
+    "theatre":          ("amenity",  "theatre"),
+    "cinema":           ("amenity",  "cinema"),
+    "nightclub":        ("amenity",  "nightclub"),
+    "bar":              ("amenity",  "bar"),
+    "community_centre": ("amenity",  "community_centre"),
+    "concert_hall":     ("amenity",  "concert_hall"),
+    "stadium":          ("leisure",  "stadium"),
+    "university":       ("amenity",  "university"),
+    "zoo":              ("tourism",  "zoo"),
+    "aquarium":         ("tourism",  "aquarium"),
 }
 
 
